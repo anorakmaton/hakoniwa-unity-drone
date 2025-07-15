@@ -44,3 +44,23 @@ sysinfo.txt
 # 一時的な自動生成Androidアセット
 /simulation/[Aa]ssets/[Ss]treamingAssets/aa.meta
 /simulation/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Oculus and XR related settings
+simulation/Assets/Oculus.meta
+simulation/Assets/Oculus/
+simulation/Assets/Resources/ImmersiveDebuggerSettings.asset
+simulation/Assets/Resources/ImmersiveDebuggerSettings.asset.meta
+simulation/Assets/Resources/MetaXRAcousticSettings.asset
+simulation/Assets/Resources/MetaXRAcousticSettings.asset.meta
+simulation/Assets/Resources/MetaXRAudioSettings.asset
+simulation/Assets/Resources/MetaXRAudioSettings.asset.meta
+simulation/Assets/Resources/OVRPlatformToolSettings.asset
+simulation/Assets/Resources/OVRPlatformToolSettings.asset.meta
+simulation/Assets/Resources/OculusRuntimeSettings.asset
+simulation/Assets/Resources/OculusRuntimeSettings.asset.meta
+simulation/Assets/XR.meta
+simulation/Assets/XR/
+
+# Project Settings related to Packages and XR
+simulation/ProjectSettings/Packages/
+simulation/ProjectSettings/XRPackageSettings.asset
