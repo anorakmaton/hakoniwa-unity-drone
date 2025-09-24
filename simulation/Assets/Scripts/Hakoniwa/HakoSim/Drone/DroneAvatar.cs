@@ -33,6 +33,7 @@ namespace hakoniwa.drone.sim
         private GameController gameController;
         private DroneConfig droneConfig;
         private LiDAR3DController[] lidars;
+        private MultiRangerController multiRanger;
         private Wind wind;
         public double sea_level_atm = 1.0;
         public double sea_level_temperature = 15.0;
@@ -168,6 +169,14 @@ namespace hakoniwa.drone.sim
                 {
                     lidar.DoInitialize(robotName, hakoPdu);
                 }
+            }
+            /*
+             * MultiRanger
+             */
+            multiRanger = this.GetComponentInChildren<MultiRangerController>();
+            if (multiRanger)
+            {
+                multiRanger.DoInitialize(robotName, hakoPdu);
             }
             /*
              * Disturbance
