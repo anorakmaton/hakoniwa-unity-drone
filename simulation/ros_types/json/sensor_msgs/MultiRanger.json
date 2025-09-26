@@ -1,0 +1,36 @@
+{  
+  "fields": [  
+    {  
+      "name": "front_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "back_range",   
+      "type": "float32"  
+    },  
+    {  
+      "name": "left_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "right_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "up_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "min_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "max_range",  
+      "type": "float32"  
+    },  
+    {  
+      "name": "field_of_view",  
+      "type": "float32"  
+    }  
+  ]  
+}

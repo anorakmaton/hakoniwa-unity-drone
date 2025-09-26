@@ -4,6 +4,7 @@ using hakoniwa.pdu.interfaces;
 using hakoniwa.pdu.msgs.geometry_msgs;
 using hakoniwa.pdu.msgs.hako_mavlink_msgs;
 using hakoniwa.pdu.msgs.hako_msgs;
+using hakoniwa.pdu.msgs.sensor_msgs;
 using hakoniwa.sim;
 using hakoniwa.sim.core;
 using UnityEngine;
@@ -21,6 +22,7 @@ namespace hakoniwa.drone.sim
         public string pdu_name_battery = "battery";
         public string pdu_name_disturbance = "disturb";
         public string pdu_name_status = "status";
+        public const string pdu_name_multiranger = "multiranger";
         public bool useBattery = true;
         public GameObject body;
         public Rigidbody rd;
@@ -178,6 +180,12 @@ namespace hakoniwa.drone.sim
             {
                 multiRanger.DoInitialize(robotName, hakoPdu);
             }
+
+            ret = hakoPdu.DeclarePduForRead(robotName, pdu_name_multiranger);
+            if (ret == false)
+            {
+                throw new ArgumentException($"Can not declare pdu for read: {robotName} {pdu_name_multiranger}");
+            }
             /*
              * Disturbance
              */
@@ -251,6 +259,22 @@ namespace hakoniwa.drone.sim
             {
                 return;
             }
+            /*
+            * MultiRanger
+            */
+            // if (multiRanger)
+            // {
+            //     IPdu pdu_multiranger = pduManager.ReadPdu(robotName, pdu_name_multiranger);
+            //     if (pdu_multiranger == null)
+            //     {
+            //         Debug.Log("Can not get pdu of multiranger");
+            //     }
+            //     else
+            //     {
+            //         MultiRanger multiranger = new MultiRanger(pdu_multiranger);
+            //         Debug.Log($"Ranges Front:{multiranger.front_range} Back:{multiranger.back_range} Left:{multiranger.left_range} Right:{multiranger.right_range} Up:{multiranger.up_range}");
+            //     }
+            // }
 
             /*
              * Position
@@ -373,6 +397,13 @@ namespace hakoniwa.drone.sim
                 }
             }
             /*
+             * MultiRanger
+             */
+            if (multiRanger)
+            {
+                multiRanger.DoControl(pduManager);
+            }
+            /*
              * Disturbance
              */ 
             if (wind != null)
@@ -462,7 +493,7 @@ namespace hakoniwa.drone.sim
                         (float)drone_status.propeller_wind.y,
                         (float)drone_status.propeller_wind.z
                     );
-                    Debug.Log("Wind: " + w);
+                    //Debug.Log("Wind: " + w);
                     foreach (var wind in propeller_winds)
                     {
                         wind.SetWindVelocityFromRos(w);

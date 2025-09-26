@@ -1,5 +1,5 @@
 ﻿using hakoniwa.pdu.interfaces;
-using hakoniwa.pdu.msgs.geometry_msgs;
+using hakoniwa.pdu.msgs.sensor_msgs;
 using hakoniwa.pdu.unity;
 using hakoniwa.sim;
 using System;
@@ -36,10 +36,11 @@ namespace hakoniwa.objects.core.sensors
             Front = 0,  // 前
             Back = 1,   // 後
             Left = 2,   // 左
-            Right = 3   // 右
+            Right = 3,   // 右
+            Up = 4      // 上
         }
 
-        private const int NUM_DIRECTIONS = 4;
+        private const int NUM_DIRECTIONS = 5;
         private float[] distances = new float[NUM_DIRECTIONS];
 
         public bool SetParams(MultiRangerParams param)
@@ -80,15 +81,15 @@ namespace hakoniwa.objects.core.sensors
             }
 
             // Initialize Twist message for MultiRanger data
-            // linear.x = front, linear.y = back, linear.z = left, angular.x = right
-            var multiranger_msg = new hakoniwa.pdu.msgs.geometry_msgs.Twist(pdu);
-            multiranger_msg.linear.x = 0.0;
-            multiranger_msg.linear.y = 0.0;
-            multiranger_msg.linear.z = 0.0;
-            multiranger_msg.angular.x = 0.0;
-            multiranger_msg.angular.y = 0.0;
-            multiranger_msg.angular.z = 0.0;
-
+            var multiranger_msg = new hakoniwa.pdu.msgs.sensor_msgs.MultiRanger(pdu);
+            multiranger_msg.front_range = 0.0f;
+            multiranger_msg.back_range = 0.0f;
+            multiranger_msg.left_range = 0.0f;
+            multiranger_msg.right_range = 0.0f;
+            multiranger_msg.up_range = 0.0f;
+            multiranger_msg.min_range = 0.0f;
+            multiranger_msg.max_range = this.MaxDistance;
+            multiranger_msg.field_of_view = 0.0f;
             pduManager.WriteNamedPdu(pdu);
             pduManager.FlushNamedPdu(pdu);
         }
@@ -110,7 +111,6 @@ namespace hakoniwa.objects.core.sensors
             this.count = 0;
 
             // Measure distances in all four directions
-            Debug.Log($"DrawDebugRays: {DrawDebugRays}");
             MeasureDistances();
 
             // Update PDU with measured distances
@@ -120,7 +120,8 @@ namespace hakoniwa.objects.core.sensors
                 throw new ArgumentException($"ERROR: can not find pdu({robotName}/{pdu_name_multiranger})");
             }
 
-            var multiranger_msg = new hakoniwa.pdu.msgs.geometry_msgs.Twist(pdu);
+            //var multiranger_msg = new hakoniwa.pdu.msgs.geometry_msgs.Twist(pdu);
+            var multiranger_msg = new hakoniwa.pdu.msgs.sensor_msgs.MultiRanger(pdu);
             UpdateMultiRangerPdu(multiranger_msg);
             pduManager.WriteNamedPdu(pdu);
             pduManager.FlushNamedPdu(pdu);
@@ -134,12 +135,14 @@ namespace hakoniwa.objects.core.sensors
             directions[(int)RangerDirection.Back] = -sensor.transform.forward;  // 後
             directions[(int)RangerDirection.Left] = -sensor.transform.right;    // 左
             directions[(int)RangerDirection.Right] = sensor.transform.right;    // 右
+            directions[(int)RangerDirection.Up] = sensor.transform.up;        // 上
 
             // Measure distance for each direction
             for (int i = 0; i < NUM_DIRECTIONS; i++)
             {
                 distances[i] = GetDistanceInDirection(directions[i], (RangerDirection)i);
             }
+            Debug.Log($"[MultiRanger] Front: {distances[(int)RangerDirection.Front]:F2}, Back: {distances[(int)RangerDirection.Back]:F2}, Left: {distances[(int)RangerDirection.Left]:F2}, Right: {distances[(int)RangerDirection.Right]:F2}");
         }
 
         private float GetDistanceInDirection(UnityEngine.Vector3 direction, RangerDirection rangerDir)
@@ -183,22 +186,16 @@ namespace hakoniwa.objects.core.sensors
             }
         }
 
-        private void UpdateMultiRangerPdu(hakoniwa.pdu.msgs.geometry_msgs.Twist multiranger_msg)
+        private void UpdateMultiRangerPdu(hakoniwa.pdu.msgs.sensor_msgs.MultiRanger multiranger_msg)
         {
-            // Use Twist message to send all four distance measurements
-            // linear.x = front distance
-            // linear.y = back distance  
-            // linear.z = left distance
-            // angular.x = right distance
-            // angular.y = max distance (for reference)
-            // angular.z = timestamp or other metadata
-            
-            multiranger_msg.linear.x = (double)distances[(int)RangerDirection.Front];
-            multiranger_msg.linear.y = (double)distances[(int)RangerDirection.Back];
-            multiranger_msg.linear.z = (double)distances[(int)RangerDirection.Left];
-            multiranger_msg.angular.x = (double)distances[(int)RangerDirection.Right];
-            multiranger_msg.angular.y = (double)this.MaxDistance;
-            multiranger_msg.angular.z = (double)Time.time; // timestamp
+            multiranger_msg.front_range = distances[(int)RangerDirection.Front];
+            multiranger_msg.back_range = distances[(int)RangerDirection.Back];
+            multiranger_msg.left_range = distances[(int)RangerDirection.Left];
+            multiranger_msg.right_range = distances[(int)RangerDirection.Right];
+            multiranger_msg.up_range = distances[(int)RangerDirection.Up];
+            multiranger_msg.min_range = 0.0f;
+            multiranger_msg.max_range = this.MaxDistance;
+            multiranger_msg.field_of_view = 60.0f; // 仮の視野角値
         }
 
         // Public methods to get individual distance measurements
@@ -221,6 +218,10 @@ namespace hakoniwa.objects.core.sensors
         {
             return distances[(int)RangerDirection.Right];
         }
+        public float GetUpDistance()
+        {
+            return distances[(int)RangerDirection.Up];
+        }
 
         public float[] GetAllDistances()
         {
@@ -242,6 +243,9 @@ namespace hakoniwa.objects.core.sensors
                     return GetLeftDistance();
                 case "right":
                     return GetRightDistance();
+                case "up":
+                case "above":
+                    return GetUpDistance();
                 default:
                     Debug.LogWarning($"Unknown direction: {direction}");
                     return MaxDistance;
