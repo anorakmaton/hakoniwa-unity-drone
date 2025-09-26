@@ -130,6 +130,15 @@
                     "pdu_size": 56,
                     "write_cycle": 1,
                     "method_type": "SHM"
+                },
+                {
+                    "type": "sensor_msgs/ZRanger",
+                    "org_name": "zranger",
+                    "name": "Drone_zranger",
+                    "channel_id": 20,
+                    "pdu_size": 40,
+                    "write_cycle": 1,
+                    "method_type": "SHM"
                 }
             ],
             "shm_pdu_writers": [
@@ -193,6 +202,15 @@
                     "name": "Drone_multiranger",
                     "channel_id": 19,
                     "pdu_size": 56,
+                    "write_cycle": 1,
+                    "method_type": "SHM"
+                },
+                {
+                    "type": "sensor_msgs/ZRanger",
+                    "org_name": "zranger",
+                    "name": "Drone_zranger",
+                    "channel_id": 20,
+                    "pdu_size": 40,
                     "write_cycle": 1,
                     "method_type": "SHM"
                 },

@@ -142,7 +142,7 @@ namespace hakoniwa.objects.core.sensors
             {
                 distances[i] = GetDistanceInDirection(directions[i], (RangerDirection)i);
             }
-            Debug.Log($"[MultiRanger] Front: {distances[(int)RangerDirection.Front]:F2}, Back: {distances[(int)RangerDirection.Back]:F2}, Left: {distances[(int)RangerDirection.Left]:F2}, Right: {distances[(int)RangerDirection.Right]:F2}");
+            //Debug.Log($"[MultiRanger] Front: {distances[(int)RangerDirection.Front]:F2}, Back: {distances[(int)RangerDirection.Back]:F2}, Left: {distances[(int)RangerDirection.Left]:F2}, Right: {distances[(int)RangerDirection.Right]:F2}");
         }
 
         private float GetDistanceInDirection(UnityEngine.Vector3 direction, RangerDirection rangerDir)

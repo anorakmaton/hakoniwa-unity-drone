@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "name": "z_range",
+      "type": "float32"
+    },
+    {
+      "name": "min_range",
+      "type": "float32"
+    },
+    {
+      "name": "max_range",
+      "type": "float32"
+    },
+    {
+      "name": "field_of_view",
+      "type": "float32"
+    }
+  ]
+}

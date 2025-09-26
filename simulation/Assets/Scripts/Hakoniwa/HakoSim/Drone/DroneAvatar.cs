@@ -23,6 +23,7 @@ namespace hakoniwa.drone.sim
         public string pdu_name_disturbance = "disturb";
         public string pdu_name_status = "status";
         public const string pdu_name_multiranger = "multiranger";
+        public const string pdu_name_zranger = "zranger";
         public bool useBattery = true;
         public GameObject body;
         public Rigidbody rd;
@@ -36,6 +37,7 @@ namespace hakoniwa.drone.sim
         private DroneConfig droneConfig;
         private LiDAR3DController[] lidars;
         private MultiRangerController multiRanger;
+        private ZRangerController zRanger;
         private Wind wind;
         public double sea_level_atm = 1.0;
         public double sea_level_temperature = 15.0;
@@ -187,6 +189,20 @@ namespace hakoniwa.drone.sim
                 throw new ArgumentException($"Can not declare pdu for read: {robotName} {pdu_name_multiranger}");
             }
             /*
+             * ZRanger
+             */
+            zRanger = this.GetComponentInChildren<ZRangerController>();
+            if (zRanger)
+            {
+                zRanger.DoInitialize(robotName, hakoPdu);
+            }
+
+            ret = hakoPdu.DeclarePduForRead(robotName, pdu_name_zranger);
+            if (ret == false)
+            {
+                throw new ArgumentException($"Can not declare pdu for read: {robotName} {pdu_name_zranger}");
+            }
+            /*
              * Disturbance
              */
             wind = this.GetComponentInChildren<Wind>();
@@ -275,7 +291,22 @@ namespace hakoniwa.drone.sim
             //         Debug.Log($"Ranges Front:{multiranger.front_range} Back:{multiranger.back_range} Left:{multiranger.left_range} Right:{multiranger.right_range} Up:{multiranger.up_range}");
             //     }
             // }
-
+            /*
+             * ZRanger
+             */
+            if (zRanger)
+            {
+                IPdu pdu_zranger = pduManager.ReadPdu(robotName, pdu_name_zranger);
+                if (pdu_zranger == null)
+                {
+                    Debug.Log("Can not get pdu of zranger");
+                }
+                else
+                {
+                    ZRanger zranger = new ZRanger(pdu_zranger);
+                    Debug.Log($"ZRanger Down:{zranger.z_range}");
+                }
+            }
             /*
              * Position
              */
@@ -402,6 +433,13 @@ namespace hakoniwa.drone.sim
             if (multiRanger)
             {
                 multiRanger.DoControl(pduManager);
+            }
+            /*
+             * ZRanger
+             */
+            if (zRanger)
+            {
+                zRanger.DoControl(pduManager);
             }
             /*
              * Disturbance
