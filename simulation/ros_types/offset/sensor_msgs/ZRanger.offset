@@ -1,0 +1,4 @@
+single:primitive:z_range:float32:0:4
+single:primitive:min_range:float32:4:4
+single:primitive:max_range:float32:8:4
+single:primitive:field_of_view:float32:12:4

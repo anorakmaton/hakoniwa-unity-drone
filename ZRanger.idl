@@ -1,0 +1,41 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from sensor_msgs/msg/ZRanger.msg
+// generated code does not contain a copyright notice
+
+module sensor_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " Single-directional range sensor reading from an active ranger that emits energy" "\n"
+      " and reports range reading in the downward direction (Z axis)." "\n"
+      " This message is appropriate for altitude sensors used on drones" "\n"
+      " for ground detection, landing assistance, and terrain following." "\n"
+      "" "\n"
+      " The range value is measured from the sensor origin to the nearest obstacle" "\n"
+      " in the downward direction.")
+    struct ZRanger {
+      @verbatim (language="comment", text=
+        " range reading in the downward direction")
+      @unit (value="m")
+      float z_range;
+
+      @verbatim (language="comment", text=
+        " minimum range value for the sensor")
+      @unit (value="m")
+      float min_range;
+
+      @verbatim (language="comment", text=
+        " maximum range value for the sensor")
+      @unit (value="m")
+      float max_range;
+
+      @verbatim (language="comment", text=
+        " the size of the arc that the distance reading is" "\n"
+        " valid for" "\n"
+        " the object causing the range reading may have" "\n"
+        " been anywhere within -field_of_view/2 and" "\n"
+        " field_of_view/2 at the measured range.")
+      @unit (value="rad")
+      float field_of_view;
+    };
+  };
+};
