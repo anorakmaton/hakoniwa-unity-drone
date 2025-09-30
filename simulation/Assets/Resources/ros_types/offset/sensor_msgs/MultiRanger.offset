@@ -1,0 +1,8 @@
+single:primitive:front_range:float32:0:4
+single:primitive:back_range:float32:4:4
+single:primitive:left_range:float32:8:4
+single:primitive:right_range:float32:12:4
+single:primitive:up_range:float32:16:4
+single:primitive:min_range:float32:20:4
+single:primitive:max_range:float32:24:4
+single:primitive:field_of_view:float32:28:4
