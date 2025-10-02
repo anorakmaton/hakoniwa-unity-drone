@@ -22,7 +22,7 @@ namespace hakoniwa.drone
 
         void Start()
         {
-            audioSource = GetComponent<AudioSource>();
+            audioSource = this.GetComponentInChildren<AudioSource>(); //GetComponent<AudioSource>();
             if (enableAudio)
             {
                 LoadAudio();
@@ -71,6 +71,11 @@ namespace hakoniwa.drone
         }
         public void Rotate(float c1, float c2, float c3, float c4)
         {
+            if (c1 + c2 + c3 + c4 == 0.0f)
+            {
+                Debug.Log("Rotate: " + c1 + "," + c2 + "," + c3 + "," + c4);
+            }
+            
             RotatePropeller(propeller1, c1);
             RotatePropeller(propeller2, -c2);
             if (propeller3)
@@ -91,7 +96,7 @@ namespace hakoniwa.drone
             }
             if (enableAudio)
             {
-                PlayAudio(c1);
+                PlayAudio(c1 + c2 + c3 + c4);
             }
 
         }
