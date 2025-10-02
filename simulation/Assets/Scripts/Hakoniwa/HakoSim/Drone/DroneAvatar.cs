@@ -286,10 +286,6 @@ namespace hakoniwa.drone.sim
             {
                 //Debug.Log("Do Drone Control..");
                 drone_control.HandleInput();
-                // if ((pduManager != null) && (camera_controller != null))
-                // {
-                //     drone_control.HandleCameraControl(camera_controller.GetCameraController(), pduManager);
-                // }
             }
 
         }

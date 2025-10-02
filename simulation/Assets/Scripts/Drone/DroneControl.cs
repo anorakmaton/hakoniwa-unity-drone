@@ -15,6 +15,8 @@ namespace hakoniwa.drone
     public interface IDroneControlOp
     {
         public void DoInitialize(string robotName);
+        public int PutUpButton(int index, int value);
+        public int PutDownButton(int index, int value);
         public int PutRadioControlButton(int index, int value);
         public int PutFlightModeChangeButton(int index, int value);
         public int PutHorizontal(int index, double value);
@@ -51,14 +53,7 @@ namespace hakoniwa.drone
         }
         private void Awake()
         {
-            if (isPlayer)
-            {
-                droneControlOp = new DroneControlRc();
-            }
-            else
-            {
-                droneControlOp = this.GetComponentInChildren<IDroneControlOp>();
-            }
+            droneControlOp = this.GetComponentInChildren<IDroneControlOp>();
             droneControlOp.DoInitialize(robotName);
         }
 
@@ -213,7 +208,23 @@ namespace hakoniwa.drone
                 }
                 magnet_on = mag_on;
             }
-            if (grabber  != null)
+            else if (controller_input.IsUpButtonPressed())
+            {
+                droneControlOp.PutUpButton(0, 1);
+            }
+            else if (controller_input.IsUpButtonReleased())
+            {
+                droneControlOp.PutUpButton(0, 0);
+            }
+            else if (controller_input.IsDownButtonPressed())
+            {
+                droneControlOp.PutDownButton(0, 1);
+            }
+            else if (controller_input.IsDownButtonReleased())
+            {
+                droneControlOp.PutDownButton(0, 0);
+            }
+            if (grabber != null)
             {
                 droneControlOp.PutMagnetStatus(magnet_on, grabber.IsGrabbed());
             }

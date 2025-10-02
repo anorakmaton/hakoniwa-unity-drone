@@ -6,6 +6,16 @@ namespace hakoniwa.drone
 {
     public class DroneControlRc : IDroneControlOp
     {
+        public int PutUpButton(int index, int value)
+        {
+            //nothing to do
+            return 0;
+        }
+        public int PutDownButton(int index, int value)
+        {
+            //nothing to do
+            return 0;
+        }
         public void DoFlush()
         {
             //nothing to do

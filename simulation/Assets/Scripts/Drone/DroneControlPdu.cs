@@ -82,6 +82,18 @@ namespace hakoniwa.drone
             this.robotName = robotName;
         }
 
+        public int PutUpButton(int index, int value)
+        {
+            button[game_ops_camera_move_up_index] = (value != 0);
+            return 0;
+        }
+
+        public int PutDownButton(int index, int value)
+        {
+            button[game_ops_camera_move_down_index] = (value != 0);
+            return 0;
+        }
+
         public int PutForward(int index, double value)
         {
             axis[game_ops_stick_move_fb] = value;
