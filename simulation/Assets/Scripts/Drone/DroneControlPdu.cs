@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace hakoniwa.drone
 {
-    public class DroneControlPdu : MonoBehaviour, IDroneControlOp, IHakoniwaWebObject
+    public class DroneControlPdu : MonoBehaviour, IDroneControlOp
     {
         public const int game_ops_arm_button_index = 0;
         public const int game_ops_grab_baggage_button_index = 1;
@@ -44,72 +44,37 @@ namespace hakoniwa.drone
 
         }
 
-        public async Task DeclarePduAsync()
+        public void DeclarePduAsync(IHakoPdu hakoPdu)
         {
-            pdu_manager = WebServerBridge.Instance.Get();
+            pdu_manager = hakoPdu.GetPduManager();
             if (pdu_manager == null)
             {
-                throw new Exception("Can not get Pdu Manager");
+                throw new ArgumentException("ERROR: can not find pduManager");
             }
-            var ret = await pdu_manager.DeclarePduForWrite(robotName, pdu_name);
+            var ret = hakoPdu.DeclarePduForWrite(robotName, pdu_name);
             Debug.Log("declare pdu hako_cmd_game: " + ret);
-
-            /*
-             * Magnet
-             */
-            if (useMagnet)
-            {
-
-                ret = await pdu_manager.DeclarePduForRead(robotName, pdu_name_cmd_magnet);
-                if (ret == false)
-                {
-                    throw new ArgumentException($"Can not declare pdu for read: {robotName} {pdu_name_cmd_magnet}");
-                }
-                ret = await pdu_manager.DeclarePduForWrite(robotName, pdu_name_status_magnet);
-                if (ret == false)
-                {
-                    throw new ArgumentException($"Can not declare pdu for read: {robotName} {pdu_name_status_magnet}");
-                }
-            }
         }
 
         public void DoFlush()
         {
             if (pdu_manager == null)
             {
+                Debug.Log("pdu_manager is null");
                 return;
             }
             var pdu_cmd_game_ctrl = pdu_manager.CreateNamedPdu(robotName, pdu_name);
             if (pdu_cmd_game_ctrl == null)
             {
+                Debug.Log($"Can not create pdu for write: {robotName} {pdu_name}");
                 return;
             }
             var cmd_game_ctrl = new hakoniwa.pdu.msgs.hako_msgs.GameControllerOperation(pdu_cmd_game_ctrl);
             cmd_game_ctrl.button = button;
             cmd_game_ctrl.axis = axis;
 
-            //Debug.Log("Abutton: button: " + button[game_ops_arm_button_index] + " pdu: " + cmd_game_ctrl.button[game_ops_arm_button_index]);
+            // Debug.Log("Abutton: button: " + button[game_ops_arm_button_index] + " pdu: " + cmd_game_ctrl.button[game_ops_arm_button_index]);
             pdu_manager.WriteNamedPdu(pdu_cmd_game_ctrl);
             pdu_manager.FlushNamedPdu(pdu_cmd_game_ctrl);
-
-
-            /*
-             * Magnet
-             */
-            if (useMagnet)
-            {
-                INamedPdu pdu_status_magnet = pdu_manager.CreateNamedPdu(robotName, pdu_name_status_magnet);
-                if (pdu_name_status_magnet == null)
-                {
-                    throw new ArgumentException($"Can not create pdu for write: {robotName} {pdu_name_status_magnet}");
-                }
-                var status_magnet = new hakoniwa.pdu.msgs.hako_msgs.HakoStatusMagnetHolder(pdu_status_magnet);
-                status_magnet.magnet_on = status_magnet_magnet_on;
-                status_magnet.contact_on = status_magnet_contact_on;
-                pdu_manager.WriteNamedPdu(pdu_status_magnet);
-                pdu_manager.FlushNamedPdu(pdu_status_magnet);
-            }
-
         }
 
         public void DoInitialize(string robotName)
@@ -143,7 +108,6 @@ namespace hakoniwa.drone
 
         public int PutRadioControlButton(int index, int value)
         {
-            Debug.Log("PutRadioControlButton: value = " + value);
             button[game_ops_arm_button_index] = (value != 0);
             return 0;
         }

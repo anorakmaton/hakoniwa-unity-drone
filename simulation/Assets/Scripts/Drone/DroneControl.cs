@@ -88,7 +88,7 @@ namespace hakoniwa.drone
             }
         }
 
-        public float move_step = 1.0f;  // ˆê‰ñ‚Ì“®‚«‚ÌƒXƒeƒbƒv—Ê
+        public float move_step = 1.0f;  // ï¿½ï¿½ï¿½Ì“ï¿½ï¿½ï¿½ï¿½ÌƒXï¿½eï¿½bï¿½vï¿½ï¿½
         private float camera_move_button_time_duration = 0f;
         public float camera_move_button_threshold_speedup = 1.0f;
         public bool is_pressed_up = false;
@@ -185,7 +185,6 @@ namespace hakoniwa.drone
             }
             if (controller_input.IsBButtonReleased())
             {
-                Debug.Log("Bbutton released");
                 magnet_on = IsMagnetOn() ? false : true;
                 if (grabber != null)
                 {

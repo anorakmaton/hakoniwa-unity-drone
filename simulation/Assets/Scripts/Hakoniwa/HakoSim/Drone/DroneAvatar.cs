@@ -46,6 +46,7 @@ namespace hakoniwa.drone.sim
         public PropellerWindController[] propeller_winds;
 
         private DronePropeller drone_propeller;
+        private DroneControl drone_control;
 
         public void EventInitialize()
         {
@@ -249,6 +250,46 @@ namespace hakoniwa.drone.sim
                     wind.SetWindVelocityFromRos(UnityEngine.Vector3.zero);
                 }
 
+            }
+
+            InitializeGameController(hakoPdu);
+        }
+        private void InitializeGameController(IHakoPdu hakoPdu = null)
+        {
+            var drone_control_pdu = this.GetComponentInChildren<DroneControlPdu>();
+            if (drone_control_pdu == null)
+            {
+                throw new Exception("Can not find DroneControlPdu");
+            }
+            else
+            {
+                drone_control_pdu.DeclarePduAsync(hakoPdu);
+            }
+            drone_control = this.GetComponentInChildren<DroneControl>();
+            if (drone_control == null)
+            {
+                Debug.Log("not found DroneControl");
+            }
+        }
+
+        void Update()
+        {
+            var pduManager = hakoPdu.GetPduManager();
+            if (pduManager == null)
+            {
+                return;
+            }
+            /*
+            * DroneControl
+            */
+            if (drone_control != null)
+            {
+                //Debug.Log("Do Drone Control..");
+                drone_control.HandleInput();
+                // if ((pduManager != null) && (camera_controller != null))
+                // {
+                //     drone_control.HandleCameraControl(camera_controller.GetCameraController(), pduManager);
+                // }
             }
 
         }
