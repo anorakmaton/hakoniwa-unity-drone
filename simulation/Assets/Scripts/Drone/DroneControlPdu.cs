@@ -121,6 +121,7 @@ namespace hakoniwa.drone
         public int PutRadioControlButton(int index, int value)
         {
             button[game_ops_arm_button_index] = (value != 0);
+            Debug.Log("🔴 PutRadioControlButton: value = " + value + " button = " + button[game_ops_arm_button_index]);
             return 0;
         }
 

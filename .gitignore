@@ -45,3 +45,5 @@ sysinfo.txt
 /simulation/[Aa]ssets/[Ss]treamingAssets/aa.meta
 /simulation/[Aa]ssets/[Ss]treamingAssets/aa/*
 simulation/Assets/TextMesh Pro/
+
+simulation/log_device.txt

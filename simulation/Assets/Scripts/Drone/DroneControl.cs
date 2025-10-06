@@ -10,7 +10,8 @@ namespace hakoniwa.drone
     {
         PS4,
         Xbox,
-        Xr
+        Xr,
+        SPIDAR
     }
     public interface IDroneControlOp
     {
@@ -76,6 +77,10 @@ namespace hakoniwa.drone
             else if (input_type == DroneControlInputType.Xbox)
             {
                 //TODO
+            }
+            else if (input_type == DroneControlInputType.SPIDAR)
+            {
+                controller_input = HakoDroneSpidarInputManager.Instance;
             }
             else
             {
