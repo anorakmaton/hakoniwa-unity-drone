@@ -5,20 +5,41 @@ using hakoniwa.objects.core;
 using Spidar = TokyoTech.Spidar.Spidar;
 using SpidarVector = TokyoTech.Spidar.Vector3;
 using SpidarQuaternion = TokyoTech.Spidar.Quaternion;
+using UnityEngine.InputSystem;
 
 public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 {
+    public bool     TransmitOnCollide   = false;
+    public bool     TransmitOnHold      = false;
+    public Material HoldingMaterial     = null;
+    public Material CollidingMaterial   = null;
+    public Material FreeMaterial        = null;
+    public Mesh     FistMesh            = null;
+    public Mesh     PalmMesh            = null;
+
     public static HakoDroneSpidarInputManager Instance { get; private set; }
+   public Rigidbody    CollidingObject { get { return collidingObject; } }
+    public Vector3      PositionOffset  { get; set; }
+    public Quaternion   RotationOffset  { get; set; }
+    private SpringDamperModel model = new SpringDamperModel();
+    private Vector3 clutchedPositionOffset = Vector3.zero;
+    private Vector3 clutchedPosition = Vector3.zero;
+    private Quaternion clutchedRotation = Quaternion.identity;
+    private bool clutchEngaged = true;
+    private Pose pose;
+    private Pose prevPose;
+    private Pose rawPose;
 
-    private Vector3 initialSpidarPosition;
-    private Quaternion initialSpidarRotation;
-
-    private Vector3 currentSpidarPosition;
-    private Quaternion currentSpidarRotation;
-    //private Renderer meshRenderer = null;
+    private uint triggerEnterCount = 0;
+    private Rigidbody collidingObject = null;
+    private Rigidbody holdingObject = null;
+    private Rigidbody transmitObject = null;
+    private Renderer meshRenderer = null;
+    private MeshFilter meshFilter = null;
     private int updateSkipCount = 0;
 
     private uint prevGpioState = 0;
+
     public int ArmChannel = 2; // Example channel for "Arm" button
     public int BButtonChannel = 5; // Example channel for "B" button
     public int XButtonChannel = 6; // Example channel for "X" button
@@ -46,9 +67,27 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         }
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        
-        Initialize();
     }
+    void Start()
+    {
+        PositionOffset = transform.position;
+        RotationOffset = transform.rotation;
+
+        model.Clear();
+
+        meshRenderer = GetComponent<MeshRenderer>();
+        meshFilter = GetComponent<MeshFilter>();
+
+        collidingObject = null;
+        holdingObject = null;
+        transmitObject = null;
+
+        meshRenderer.material = FreeMaterial;
+        meshFilter.mesh = PalmMesh;
+
+        requestInit = !Initialize();
+    }
+
 
     void Update()
     {
@@ -56,10 +95,19 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         {
             updateSkipCount--;
             return;
-        }
+        }   
+        // if (FixedDeltaTime != Time.fixedDeltaTime)
+        //     Time.fixedDeltaTime = FixedDeltaTime;
+
+        if (GetGpioDown(CalibrationChannel))
+            Calibrate();
+    }
+
+    void FixedUpdate()
+    {
         if (spidar != null)
         {
-            UpdateSpidarPose();
+            GetSpidarPose();
         }
     }
 
@@ -79,11 +127,11 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         if (spidar != null)
         {
             updateSkipCount = 100;
-            //meshRenderer.enabled = true;
+            meshRenderer.enabled = true;
         }
         else
         {
-            //meshRenderer.enabled = false;
+            meshRenderer.enabled = false;
         }
 
         return flag;
@@ -91,27 +139,55 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
     public void Calibrate()
     {
-        if (spidar == null) return;
-        
-        SpidarVector pos;
-        SpidarQuaternion rot;
-        spidar.GetPose(out pos, out rot, out _, out _);
-        
-        initialSpidarPosition = new Vector3(pos.x, pos.y, pos.z);
-        initialSpidarRotation = new Quaternion(rot.x, rot.y, rot.z, rot.w);
-        
+        clutchEngaged = false;
+
+        if (spidar != null)
+            spidar.Calibrate();
+
+        clutchedPositionOffset = Vector3.zero;
+        clutchedPosition = Vector3.zero;
+        clutchedRotation = Quaternion.identity;
+        clutchEngaged = true;
         Debug.Log("✅ SPIDAR Calibrated. Initial Pose captured.");
     }
     
-    private void UpdateSpidarPose()
+    void GetSpidarPose()
     {
-        SpidarVector pos;
+        prevPose = pose;
+
+        SpidarVector pos, vel, avel;
         SpidarQuaternion rot;
-        spidar.GetPose(out pos, out rot, out _, out _);
-        
-        currentSpidarPosition = new Vector3(pos.x, pos.y, pos.z);
-        currentSpidarRotation = new Quaternion(rot.x, rot.y, rot.z, rot.w);
+
+        pos = vel = avel = SpidarVector.zero;
+        rot = SpidarQuaternion.identity;
+
+        if (spidar != null)
+            spidar.GetPose(out pos, out rot, out vel, out avel);
+
+        rawPose.position = Converter.ScaleUp(Converter.Convert(pos), PositionScale);
+        rawPose.rotation = Converter.ScaleUp(Converter.Convert(rot), RotationScale);
+        rawPose.velocity = Converter.ScaleUp(Converter.Convert(vel), PositionScale);
+        rawPose.angularVelocity = Converter.ScaleUp(Converter.Convert(avel), RotationScale);
+
+        if (clutchEngaged)
+        {
+            pose.position = RotationOffset * (rawPose.position + clutchedPositionOffset) + PositionOffset;
+            pose.rotation = RotationOffset * rawPose.rotation;
+            pose.velocity = RotationOffset * rawPose.velocity;
+            pose.angularVelocity = RotationOffset * rawPose.angularVelocity;
+        }
+        else
+        {
+            pose.position = RotationOffset * clutchedPosition + PositionOffset;
+            pose.rotation = RotationOffset * clutchedRotation;
+            pose.velocity = Vector3.zero;
+            pose.angularVelocity = Vector3.zero;
+        }
+
+        transform.localPosition = pose.position;
+        transform.localRotation = pose.rotation;
     }
+
     
     private float ApplyDeadzone(float value, float threshold)
     {
@@ -127,19 +203,17 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         if (spidar == null) return Vector2.zero;
         
         // --- Yaw (Rotation) ---
-        // Calculate relative rotation from calibrated orientation
-        Quaternion relativeRotation = Quaternion.Inverse(initialSpidarRotation) * currentSpidarRotation;
-        float yaw = relativeRotation.eulerAngles.y;
+        float yaw = pose.rotation.y;
         if (yaw > 180) yaw -= 360;
         
         float normalizedYaw = Mathf.Clamp(yaw / yawMaxAngle, -1.0f, 1.0f);
         float processedYaw = ApplyDeadzone(normalizedYaw, rotationDeadzone);
 
         // --- Up/Down (Position Y) ---
-        float upDown = (currentSpidarPosition.y - initialSpidarPosition.y) * positionScale;
+        float upDown = pose.position.y * positionScale;
         float processedUpDown = Mathf.Abs(upDown) > positionDeadzone ? upDown : 0f;
-        
-        return new Vector2(processedYaw * yawSensitivity, processedUpDown * upDownSensitivity);
+        //Debug.Log($"axis[0]: {processedYaw * yawSensitivity}, axis[1]: {processedUpDown * upDownSensitivity}");
+        return new Vector2(0.0f, processedUpDown * upDownSensitivity); //processedYaw * yawSensitivity
     }
 
     public Vector2 GetRightStickInput()
@@ -147,52 +221,25 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         if (spidar == null) return Vector2.zero;
 
         // --- Forward/Back (Position Z) & Right/Left (Position X) ---
-        float forwardBack = (currentSpidarPosition.z - initialSpidarPosition.z) * positionScale;
-        float rightLeft = (currentSpidarPosition.x - initialSpidarPosition.x) * positionScale;
+        float forwardBack = pose.position.z * positionScale;
+        float rightLeft = pose.position.x * positionScale;
 
         float processedForwardBack = Mathf.Abs(forwardBack) > positionDeadzone ? forwardBack : 0f;
         float processedRightLeft = Mathf.Abs(rightLeft) > positionDeadzone ? rightLeft : 0f;
-
+        Debug.Log($"axis[0]: {processedRightLeft * rightLeftSensitivity}, axis[1]: {processedForwardBack * forwardBackSensitivity}");
         return new Vector2(processedRightLeft * rightLeftSensitivity, processedForwardBack * forwardBackSensitivity);
     }
 
-    // private bool GetSpidarButtonDown(int channel)
-    // {
-    //     if (spidar == null) return false;
-        
-    //     // Note: SPIDAR GPIO seems to be 1 for released, 0 for pressed.
-    //     uint currentGpioState = spidar.GetGpioValue();
-    //     bool wasPressed = (prevGpioState & (1 << channel)) == 0;
-    //     bool isPressed = (currentGpioState & (1 << channel)) == 0;
-        
-    //     return isPressed && !wasPressed;
-    // }
-
-    void LateUpdate()
-    {
-        // Update previous state at the end of the frame
-        if (spidar != null)
-        {
-            prevGpioState = spidar.GetGpioValue();
-        }
-    }
-
     // --- Button Mappings (Example) ---
-    public bool IsAButtonPressed() {
-        var value = GetGpioDown(ArmChannel);
-        if (value) {
-            Debug.Log("1🔵 SPIDAR Arm Button Pressed.");
-        }
-        return value; // Button 1
-    }
+    public bool IsAButtonPressed() { return GetGpioDown(ArmChannel); }
     public bool IsBButtonPressed() { return GetGpioDown(BButtonChannel); } // Button 2
     public bool IsXButtonPressed() { return GetGpioDown(XButtonChannel); } // Button 3
     public bool IsYButtonPressed() { return GetGpioDown(YButtonChannel); } // Button 4
     // Release events can be implemented similarly if needed
-    public bool IsAButtonReleased() { return GetGpioUp(0); }
-    public bool IsBButtonReleased() { return GetGpioUp(1); }
-    public bool IsXButtonReleased() { return GetGpioUp(2); }
-    public bool IsYButtonReleased() { return GetGpioUp(3); }
+    public bool IsAButtonReleased() { return GetGpioUp(ArmChannel); }
+    public bool IsBButtonReleased() { return GetGpioUp(BButtonChannel); }
+    public bool IsXButtonReleased() { return GetGpioUp(XButtonChannel); }
+    public bool IsYButtonReleased() { return GetGpioUp(YButtonChannel); }
     public bool IsUpButtonPressed() { return false; }
     public bool IsUpButtonReleased() { return false; }
     public bool IsDownButtonPressed() { return false; }

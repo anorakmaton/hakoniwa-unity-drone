@@ -118,7 +118,7 @@ namespace hakoniwa.objects.core.sensors
 
             // Measure distance in downward direction
             downDistance = GetDistanceInDirection(downDirection);
-            Debug.Log($"[ZRanger] Down: {downDistance:F2}");
+            //Debug.Log($"[ZRanger] Down: {downDistance:F2}");
         }
 
         private float GetDistanceInDirection(UnityEngine.Vector3 direction)

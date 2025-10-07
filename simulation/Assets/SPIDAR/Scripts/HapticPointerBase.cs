@@ -37,7 +37,7 @@ abstract public class HapticPointerBase : MonoBehaviour
     public bool ToggleClutch = false;
     public int HoldChannel = 0;
     public int ClutchChannel = 0;
-    public int CalibrationChannel = 0;
+    public int CalibrationChannel = 3;
     public static float FixedDeltaTime = 0.001f;
 
     public bool Activated { get { return spidar != null; } }

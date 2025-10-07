@@ -388,7 +388,13 @@ public class PointerSetting : MonoBehaviour
         ShowLabeledItem("Hold channel", ref _pointers[deviceNo].HoldChannel, (_pointers[deviceNo] as HapticPointer) != null);
         ShowLabeledItem("Clutch channel", ref _pointers[deviceNo].ClutchChannel);
         ShowLabeledItem("Calibration channel", ref _pointers[deviceNo].CalibrationChannel);
-        ShowLabeledItem("Arm channel", ref (_pointers[deviceNo] as HakoDroneSpidarInputManager).ArmChannel, (_pointers[deviceNo] as HakoDroneSpidarInputManager) != null);
+        
+        // HakoDroneSpidarInputManagerの場合のみArm channelを表示
+        var hakoDroneManager = _pointers[deviceNo] as HakoDroneSpidarInputManager;
+        if (hakoDroneManager != null)
+        {
+            ShowLabeledItem("Arm channel", ref hakoDroneManager.ArmChannel, true);
+        }
 
         GUILayout.Space(10);
         if (GUILayout.Button("Revert to the default"))

@@ -341,7 +341,7 @@ namespace hakoniwa.drone.sim
                 else
                 {
                     ZRanger zranger = new ZRanger(pdu_zranger);
-                    Debug.Log($"ZRanger Down:{zranger.z_range}");
+                    //Debug.Log($"ZRanger Down:{zranger.z_range}");
                 }
             }
             /*
