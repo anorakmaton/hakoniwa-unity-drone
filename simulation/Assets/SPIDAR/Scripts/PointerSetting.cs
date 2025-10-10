@@ -383,9 +383,11 @@ public class PointerSetting : MonoBehaviour
         ShowLabeledItem("Damper B", ref _pointers[deviceNo].DeviceDamperB, "f1");
         ShowLabeledItem("Cascade control", ref _pointers[deviceNo].CascadeControl);
         ShowLabeledItem("Cascade gain", ref _pointers[deviceNo].CascadeGain, "f1");
-        ShowLabeledItem("Toggle hold", ref _pointers[deviceNo].ToggleHold, (_pointers[deviceNo] as HapticPointer) != null);
+        ShowLabeledItem("Toggle hold", ref _pointers[deviceNo].ToggleHold, 
+            (_pointers[deviceNo] as HapticPointer) != null || (_pointers[deviceNo] as HakoDroneSpidarInputManager) != null);
         ShowLabeledItem("Toggle clutch", ref _pointers[deviceNo].ToggleClutch);
-        ShowLabeledItem("Hold channel", ref _pointers[deviceNo].HoldChannel, (_pointers[deviceNo] as HapticPointer) != null);
+        ShowLabeledItem("Hold channel", ref _pointers[deviceNo].HoldChannel,
+            (_pointers[deviceNo] as HapticPointer) != null || (_pointers[deviceNo] as HakoDroneSpidarInputManager) != null);
         ShowLabeledItem("Clutch channel", ref _pointers[deviceNo].ClutchChannel);
         ShowLabeledItem("Calibration channel", ref _pointers[deviceNo].CalibrationChannel);
         
