@@ -34,17 +34,11 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private uint triggerEnterCount = 0;
     private Rigidbody collidingObject = null;
     private Rigidbody holdingObject = null;
-    private Rigidbody transmitObject = null;
     private Renderer meshRenderer = null;
     private MeshFilter meshFilter = null;
     private bool curMultiHold = false;
-    private bool prvMultiHold = false;
-
     private int curHoldCount = 0;
     private int updateSkipCount = 0;
-
-    private uint prevGpioState = 0;
-
     public int ArmChannel = 2; // Example channel for "Arm" button
     public int BButtonChannel = 5; // Example channel for "B" button
     public int XButtonChannel = 6; // Example channel for "X" button
@@ -52,7 +46,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     
     // [MODIFIED] Sensitivity Settingsを調整
     [Header("Sensitivity Settings")]
-    public float maxDisplacement = 1.5f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
+    public float maxDisplacement = 2.5f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
     public float upDownSensitivity = 1.0f;
     public float forwardBackSensitivity = 1.0f;
     public float rightLeftSensitivity = 1.0f;
@@ -94,7 +88,6 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
         collidingObject = null;
         holdingObject = null;
-        transmitObject = null;
 
         meshRenderer.material = FreeMaterial;
         meshFilter.mesh = PalmMesh;
@@ -217,6 +210,10 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
             Time.fixedDeltaTime = FixedDeltaTime;
 
         if (GetGpioDown(CalibrationChannel))
+            Calibrate();
+
+        // スペースキーが押されたときにもCalibrateを実行
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             Calibrate();
 
         if (ToggleClutch)
@@ -558,8 +555,8 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         
         // Apply sensitivity and clamp the final value to the -1 ~ 1 range
         return new Vector2(
-            0.0f, //Mathf.Clamp(processedLeftRight * rightLeftSensitivity, -1.0f, 1.0f),
-            0.0f //Mathf.Clamp(processedForwardBack * forwardBackSensitivity, -1.0f, 1.0f)
+            Mathf.Clamp(processedLeftRight * rightLeftSensitivity, -1.0f, 1.0f),
+            Mathf.Clamp(processedForwardBack * forwardBackSensitivity, -1.0f, 1.0f)
         );
     }
 

@@ -16,9 +16,9 @@ public class PointerControl : MonoBehaviour
 
     void Start()
     {
-        _pointers = GameObject.FindObjectsOfType(typeof(HapticPointerBase)) as HapticPointerBase[];
+        HapticPointerBase[] _pointers = (HapticPointerBase[])Object.FindObjectsByType(typeof(HapticPointerBase), FindObjectsSortMode.None);
 
-        _pointerSetting = GameObject.FindObjectOfType(typeof(PointerSetting)) as PointerSetting;
+        PointerSetting _pointerSetting = (PointerSetting)Object.FindObjectsByType(typeof(PointerSetting), FindObjectsSortMode.None)[0];
 
         GUIStyleState state = new GUIStyleState();
         state.textColor = Color.black;
