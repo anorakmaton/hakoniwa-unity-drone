@@ -19,7 +19,7 @@
                     "DrawDebugPoints": true
                 },
                 "DJIAvatarLiDAR": {
-                    "Enabled": true,
+                    "Enabled": false,
                     "NumberOfChannels": 16,
                     "RotationsPerSecond": 10,
                     "PointsPerSecond": 10000,
