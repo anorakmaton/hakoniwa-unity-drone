@@ -6,6 +6,7 @@ using Spidar = TokyoTech.Spidar.Spidar;
 using SpidarVector = TokyoTech.Spidar.Vector3;
 using SpidarQuaternion = TokyoTech.Spidar.Quaternion;
 using UnityEngine.InputSystem;
+using Unity.VisualScripting;
 
 public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 {
@@ -50,7 +51,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     public float upDownSensitivity = 1.0f;
     public float forwardBackSensitivity = 1.0f;
     public float rightLeftSensitivity = 1.0f;
-    public float yawSensitivity = -1.0f;
+    public float yawSensitivity = 1.0f;
     public float yawMaxAngle = 45.0f; 
 
     [Header("Deadzone Settings")]
@@ -311,9 +312,10 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         }
     }
     
-    // ... (GetSpidarPose, SetSpidarForce, SetObjectForce, GetHoldState, ApplyDeadzone, RemoveHoldStateは変更なし) ...
     void GetSpidarPose()
     {
+        PositionOffset = droneBody.position;
+        RotationOffset = droneBody.rotation;
         prevPose = pose;
 
         SpidarVector pos, vel, avel;
@@ -325,43 +327,43 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         if (spidar != null)
             spidar.GetPose(out pos, out rot, out vel, out avel);
 
+        rawPose.position = Converter.ScaleUp(Converter.Convert(pos), PositionScale);
+        rawPose.rotation = Converter.ScaleUp(Converter.Convert(rot), RotationScale);
+        rawPose.velocity = Converter.ScaleUp(Converter.Convert(vel), PositionScale);
+        rawPose.angularVelocity = Converter.ScaleUp(Converter.Convert(avel), RotationScale);
+
         // [FIXED] SPIDAR座標系からUnity座標系への変換
-        Vector3 spidarPos = Converter.Convert(pos);
+        Vector3 spidarPos = rawPose.position;
         Vector3 unityPos = new Vector3(spidarPos.z, -spidarPos.y, spidarPos.x);
-        
-        Vector3 spidarVel = Converter.Convert(vel);
+
+        Vector3 spidarVel = rawPose.velocity;
         Vector3 unityVel = new Vector3(spidarVel.z, -spidarVel.y, spidarVel.x);
 
-        Vector3 spidarAvel = Converter.Convert(avel);
+        Vector3 spidarAvel = rawPose.angularVelocity;
         Vector3 unityAvel = new Vector3(spidarAvel.z, -spidarAvel.y, spidarAvel.x);
 
         // 回転も座標系に合わせて変換
-        Quaternion spidarRot = Converter.Convert(rot);
+        Quaternion spidarRot = rawPose.rotation;
         // X軸とY軸の入れ替え、Y軸反転に対応した回転変換
         Quaternion unityRot = new Quaternion(spidarRot.z, -spidarRot.y, spidarRot.x, spidarRot.w);
-
-        rawPose.position = Converter.ScaleUp(unityPos, PositionScale);
-        rawPose.rotation = Converter.ScaleUp(unityRot, RotationScale);
-        rawPose.velocity = Converter.ScaleUp(unityVel, PositionScale);
-        rawPose.angularVelocity = Converter.ScaleUp(unityAvel, RotationScale);
         
         // ドローンの動きも反映
-        if (droneBody != null)
-        {
-            // ドローンの位置と回転を取得
-            Vector3 dronePosition = droneBody.position;
-            Quaternion droneRotation = droneBody.rotation;
+        // if (droneBody != null)
+        // {
+        //     // ドローンの位置と回転を取得
+        //     Vector3 dronePosition = droneBody.position;
+        //     Quaternion droneRotation = droneBody.rotation;
 
-            // DronePointerの位置と回転にドローンの変化を加算
-            rawPose.position += new Vector3(dronePosition.x, dronePosition.y, dronePosition.z);
-            //rawPose.rotation = droneRotation * rawPose.rotation;
-        }
+        //     // DronePointerの位置と回転にドローンの変化を加算
+        //     rawPose.position += new Vector3(dronePosition.x, dronePosition.y, dronePosition.z);
+        //     rawPose.rotation = droneRotation * rawPose.rotation;
+        // }
         if (clutchEngaged)
         {
-            pose.position = RotationOffset * (rawPose.position + clutchedPositionOffset) + PositionOffset;
-            pose.rotation = RotationOffset * rawPose.rotation;
-            pose.velocity = RotationOffset * rawPose.velocity;
-            pose.angularVelocity = RotationOffset * rawPose.angularVelocity;
+            pose.position = RotationOffset * (unityPos + clutchedPositionOffset) + PositionOffset;
+            pose.rotation = RotationOffset * unityRot;
+            pose.velocity = RotationOffset * unityVel;
+            pose.angularVelocity = RotationOffset * unityAvel;
         }
         else
         {
@@ -384,28 +386,28 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
         if (holdingObject == null || !clutchEngaged) return;
 
-        HoldState hs = GetHoldState();
+        // HoldState hs = GetHoldState();
 
         Vector3 g = Vector3.zero;
 
-        if (Gravity)
-        {
-            g = Vector3.down * holdingObject.mass * 9.81f;
-            g = Quaternion.Inverse(RotationOffset) * g;
-        }
+        // if (Gravity)
+        // {
+        //     g = Vector3.down * holdingObject.mass * 9.81f;
+        //     g = Quaternion.Inverse(RotationOffset) * g;
+        // }
 
-        if (!hs.Collision && !curMultiHold)
-        {
-            if (Gravity)
-            {
-                spidar.SetForce(Converter.Convert(g), 0, 0, Converter.Convert(Vector3.zero), 0, 0, true, false);
-            }
-            else
-            {
-                spidar.ClearForce(true);
-            }
-            return;
-        }
+        // if (!hs.Collision && !curMultiHold)
+        // {
+        //     if (Gravity)
+        //     {
+        //         spidar.SetForce(Converter.Convert(g), 0, 0, Converter.Convert(Vector3.zero), 0, 0, true, false);
+        //     }
+        //     else
+        //     {
+        //         spidar.ClearForce(true);
+        //     }
+        //     return;
+        // }
 
         float deviceR2 = spidar.GetGripRadius() * spidar.GetGripRadius();
 
@@ -418,16 +420,27 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         f = Quaternion.Inverse(RotationOffset) * f;
         t = Quaternion.Inverse(RotationOffset) * t;
 
+        // --- 明示的な軸逆変換（GetSpidarPose の変換 unity = (z, -y, x) の逆） ---
+        Vector3 spidarForceVec = new Vector3(f.z, -f.y, f.x);
+        Vector3 spidarTorqueVec = new Vector3(t.z, -t.y, t.x);
+
+        f = spidarForceVec;
+        t = spidarTorqueVec;
+
         float forceK = DeviceSpringK;
         float forceB = DeviceDamperB;
 
         float torqueK = DeviceSpringK * deviceR2;
         float torqueB = DeviceDamperB * deviceR2;
 
-        // [FIXED] SPIDAR座標系からUnity座標系への変換
-        Vector3 spidarF = new Vector3(f.z, -f.y, f.x);
-        Vector3 spidarT = new Vector3(t.z, -t.y, t.x);
-        spidar.SetForce(Converter.Convert(spidarF + g), forceK, forceB, Converter.Convert(spidarT), torqueK, torqueB, false, CascadeControl);
+        // SPIDARの基準点へ戻る力を加える
+        Vector3 spidarForce = -rawPose.position * 1.0f;
+        Vector3 spidarTorque =  -new Vector3(rawPose.rotation.x, rawPose.rotation.y, rawPose.rotation.z) * 0.5f;
+        
+        f += spidarForce;
+        t += spidarTorque;
+        
+        spidar.SetForce(Converter.Convert(f + g), forceK, forceB, Converter.Convert(t), torqueK, torqueB, false, CascadeControl);
     }
 
     void SetObjectForce()
@@ -452,7 +465,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
             holdingObject.AddForce(droneForce);
             holdingObject.AddTorque(droneTorque);
-            
+
             return;
         }
 
@@ -513,22 +526,14 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         float processedUpDown = ApplyDeadzone(normalizedY, positionDeadzone);
 
         // --- ヨー操作 (Yaw) ---
-        // ドローン本体とDronePointerのローカル回転の差分からYawを計算
-        float droneYaw = 0f;
-        if (droneBody != null)
-        {
-            // ドローン本体のYaw（Y軸回りの回転角度）
-            droneYaw = droneBody.rotation.eulerAngles.y;
-        }
-        float pointerYaw = dronePointerTransform.rotation.eulerAngles.y;
-        float yawDiff = droneYaw - pointerYaw;
-        if (yawDiff > 180f) yawDiff -= 360f;
-        if (yawDiff < -180f) yawDiff += 360f;
+        //Quaternion relativeRotation = Quaternion.Inverse(initialDronePointerRotation) * dronePointer.rotation;
+        float yaw = dronePointerTransform.localEulerAngles.y; // ドローンの回転を考慮しない場合
+        if (Mathf.Abs(yaw) > 180) yaw -= 360; // 角度を-180から180の範囲に正規化
 
-        float normalizedYaw = Mathf.Clamp(yawDiff / yawMaxAngle, -1.0f, 1.0f);
+        float normalizedYaw = Mathf.Clamp(yaw / yawMaxAngle, -1.0f, 1.0f);
         float processedYaw = ApplyDeadzone(normalizedYaw, rotationDeadzone);
 
-        Debug.Log($"🔧 DronePointer YawDiff: {yawDiff} degrees (Pointer: {pointerYaw}, Drone: {droneYaw}), value: {Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f)}");
+        //Debug.Log($"🔧 DronePointer YawDiff: {yaw} degree value: {Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f)}");
         // Apply sensitivity and clamp the final value to the -1 ~ 1 range
         return new Vector2(
             Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f), // 正が右回転
