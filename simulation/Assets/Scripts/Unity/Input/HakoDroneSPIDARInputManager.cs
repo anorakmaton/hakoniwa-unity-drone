@@ -40,6 +40,9 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private bool curMultiHold = false;
     private int curHoldCount = 0;
     private int updateSkipCount = 0;
+    private float holdStartTime = -1f;
+    private float lastSpidarLogTime = 0.0f;
+    private int refreshFramesRemaining = 0;
     public int ArmChannel = 2; // Example channel for "Arm" button
     public int BButtonChannel = 5; // Example channel for "B" button
     public int XButtonChannel = 6; // Example channel for "X" button
@@ -129,6 +132,9 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
         meshRenderer.material = HoldingMaterial;
 
+        // 保持開始時刻を記録（定期リフレッシュ用）
+        holdStartTime = Time.time;
+
         return true;
     }
 
@@ -161,6 +167,9 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         {
             meshRenderer.material = FreeMaterial;
         }
+
+        // リリース時は保持開始時刻をクリア
+        holdStartTime = -1f;
 
         return true;
     }
@@ -384,6 +393,41 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         spidar.SetHaptics(Haptics);
         spidar.SetCascadeGain(CascadeGain);
 
+        // デバッグ出力（10秒毎）と定期リフレッシュ（長時間ホールドでデバイスが出力を止める回避）
+        // if (Time.time - lastSpidarLogTime >= 10.0f)
+        // {
+        //     float hold = (holdStartTime > 0f) ? Time.time - holdStartTime : -1f;
+        //     string holdStr = (hold >= 0f) ? $"{hold:F1}s" : "not holding";
+        //     bool spidarIsNull = (spidar == null);
+        //     Debug.Log($"[SPIDAR][HakoDrone] Time={Time.time:F1}, holdStart={holdStartTime:F1}, holdTime={holdStr}, refreshFrames={refreshFramesRemaining}, spidarNull={spidarIsNull}");
+        //     lastSpidarLogTime = Time.time;
+        // }
+
+        // 120秒以上力覚提示を行うとSPIDARが力覚出力を停止する問題への対策
+        const float refreshStart = 110f; // 閾値（秒）
+        // 閾値越えで次の5フレーム連続で ClearForce を送る
+        if (holdStartTime > 0 && Time.time - holdStartTime > refreshStart && refreshFramesRemaining == 0)
+        {
+            Debug.Log("[SPIDAR][HakoDrone] Hold refresh triggered: clearing force for 5 frames.");
+            refreshFramesRemaining = 5;
+            // リフレッシュ実行を記録して次回トリガを防ぐ
+            holdStartTime = Time.time;
+        }
+
+        if (refreshFramesRemaining > 0)
+        {
+            try
+            {
+                spidar.ClearForce();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[SPIDAR][HakoDrone] ClearForce failed during refresh: {ex.Message}");
+            }
+            refreshFramesRemaining--;
+            return;
+        }
+
         if (holdingObject == null || !clutchEngaged) return;
 
         // HoldState hs = GetHoldState();
@@ -439,7 +483,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         
         f += spidarForce;
         t += spidarTorque;
-        
+        //Debug.Log($"🔧 SPIDAR Force: {f}, Torque: {t}");
         spidar.SetForce(Converter.Convert(f + g), forceK, forceB, Converter.Convert(t), torqueK, torqueB, false, CascadeControl);
     }
 
@@ -557,7 +601,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         // Normalize displacement to -1 ~ 1 range
         float normalizedZ = Mathf.Clamp(relativeZ / maxDisplacement, -1.0f, 1.0f);
         float processedForwardBack = ApplyDeadzone(normalizedZ, positionDeadzone);
-        
+
         // Apply sensitivity and clamp the final value to the -1 ~ 1 range
         return new Vector2(
             Mathf.Clamp(processedLeftRight * rightLeftSensitivity, -1.0f, 1.0f),
