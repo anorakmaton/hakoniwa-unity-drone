@@ -10,6 +10,12 @@ using Unity.VisualScripting;
 
 public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 {
+    [Header("Response Curve Settings")]
+    // 初期値として、(0,0)から(1,1)へ向かう緩やかなカーブを設定しておきます
+    public AnimationCurve inputResponseCurve = new AnimationCurve(
+        new Keyframe(0f, 0f, 0f, 0f),      // 開始点 (入力0 -> 出力0, 接線フラット)
+        new Keyframe(1f, 1f, 2f, 0f)       // 終了点 (入力1 -> 出力1, 接線急角度)
+    );
     // ... (既存のpublic変数は変更なし) ...
     public bool     TransmitOnCollide   = false;
     public bool     TransmitOnHold      = false;
@@ -31,7 +37,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private Pose pose;
     private Pose prevPose;
     private Pose rawPose;
-
+    public bool basicForceFeedback = false;
     private uint triggerEnterCount = 0;
     private Rigidbody collidingObject = null;
     private Rigidbody holdingObject = null;
@@ -43,6 +49,9 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private float holdStartTime = -1f;
     private float lastSpidarLogTime = 0.0f;
     private int refreshFramesRemaining = 0;
+    [Header("Debug")]
+    public bool DebugAxisOutput = true;
+    public float axisDebugInterval = 1.0f;
     public int ArmChannel = 2; // Example channel for "Arm" button
     public int BButtonChannel = 5; // Example channel for "B" button
     public int XButtonChannel = 6; // Example channel for "X" button
@@ -50,7 +59,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     
     // [MODIFIED] Sensitivity Settingsを調整
     [Header("Sensitivity Settings")]
-    public float maxDisplacement = 2.5f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
+    public float maxDisplacement = 1.0f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
     public float upDownSensitivity = 1.0f;
     public float forwardBackSensitivity = 1.0f;
     public float rightLeftSensitivity = 1.0f;
@@ -58,8 +67,8 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     public float yawMaxAngle = 45.0f; 
 
     [Header("Deadzone Settings")]
-    public float positionDeadzone = 0.4f; // Deadzone for normalized position input
-    public float rotationDeadzone = 0.1f;
+    public float positionDeadzone = 0f; // Deadzone for normalized position input
+    public float rotationDeadzone = 0.3f;
 
     // [ADDED] DronePointerへの参照と初期状態を保持する変数を追加
     [Header("Drone Control Target")]
@@ -478,11 +487,14 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         float torqueB = DeviceDamperB * deviceR2;
 
         // SPIDARの基準点へ戻る力を加える
-        Vector3 spidarForce = -rawPose.position * 1.0f;
-        Vector3 spidarTorque =  -new Vector3(rawPose.rotation.x, rawPose.rotation.y, rawPose.rotation.z) * 0.5f;
-        
-        f += spidarForce;
-        t += spidarTorque;
+        if (basicForceFeedback)
+        {
+            Vector3 spidarForce = -rawPose.position * 1.0f;
+            Vector3 spidarTorque =  -new Vector3(rawPose.rotation.x, rawPose.rotation.y, rawPose.rotation.z) * 0.5f;
+            
+            f += spidarForce;
+            t += spidarTorque;
+        }
         //Debug.Log($"🔧 SPIDAR Force: {f}, Torque: {t}");
         spidar.SetForce(Converter.Convert(f + g), forceK, forceB, Converter.Convert(t), torqueK, torqueB, false, CascadeControl);
     }
@@ -548,6 +560,17 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         }
         return Mathf.Sign(value) * (Mathf.Abs(value) - threshold) / (1.0f - threshold);
     }
+    // カーブを適用するメソッド
+    private float ApplyResponseCurve(float value)
+    {
+        // 入力の絶対値に対してカーブを評価 (0.0 ～ 1.0)
+        float absValue = Mathf.Abs(value);
+        float curvedValue = inputResponseCurve.Evaluate(absValue);
+
+        // 符号を元に戻して返す (-1.0 ～ 1.0)
+        return Mathf.Sign(value) * curvedValue;
+    }
+
     void RemoveHoldState()
     {
         GameObject obj = holdingObject.gameObject;
@@ -561,48 +584,59 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     // [MODIFIED] GetLeftStickInputの実装
     public Vector2 GetLeftStickInput()
     {
-        if (dronePointer == null) return Vector2.zero;
+        // SPIDAR の pose を基準にドローン局所座標へ変換して入力を計算する
+        if (spidar == null) return Vector2.zero;
+
+        // ドローン局所座標 = RotationOffset^-1 * (pose.position - PositionOffset)
+        Vector3 droneLocalPos = Quaternion.Inverse(RotationOffset) * (pose.position - PositionOffset);
 
         // --- 上下移動 (Y-axis) ---
-        float relativeY = dronePointerTransform.localPosition.y;
-        // Normalize displacement to -1 ~ 1 range
+        float relativeY = droneLocalPos.y;
         float normalizedY = Mathf.Clamp(relativeY / maxDisplacement, -1.0f, 1.0f);
         float processedUpDown = ApplyDeadzone(normalizedY, positionDeadzone);
 
         // --- ヨー操作 (Yaw) ---
-        //Quaternion relativeRotation = Quaternion.Inverse(initialDronePointerRotation) * dronePointer.rotation;
-        float yaw = dronePointerTransform.localEulerAngles.y; // ドローンの回転を考慮しない場合
-        if (Mathf.Abs(yaw) > 180) yaw -= 360; // 角度を-180から180の範囲に正規化
-
+        Quaternion localRot = Quaternion.Inverse(RotationOffset) * pose.rotation;
+        float yaw = localRot.eulerAngles.y;
+        if (yaw > 180f) yaw -= 360f;
         float normalizedYaw = Mathf.Clamp(yaw / yawMaxAngle, -1.0f, 1.0f);
         float processedYaw = ApplyDeadzone(normalizedYaw, rotationDeadzone);
 
-        //Debug.Log($"🔧 DronePointer YawDiff: {yaw} degree value: {Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f)}");
-        // Apply sensitivity and clamp the final value to the -1 ~ 1 range
+        // if (DebugAxisOutput)
+        // {
+        //     Debug.Log($"[DroneInput][LeftStick] yaw={yaw:F1} normalizedYaw={normalizedYaw:F3} processedYaw={processedYaw:F3} upDown={processedUpDown:F3}");
+        // }
+
         return new Vector2(
             Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f), // 正が右回転
             Mathf.Clamp(processedUpDown * upDownSensitivity, -1.0f, 1.0f)
         );
     }
 
-    // [MODIFIED] GetRightStickInputの実装
+    // GetRightStickInputの実装
     public Vector2 GetRightStickInput()
     {
-        if (dronePointer == null) return Vector2.zero;
+        // SPIDAR の pose を基準にドローン局所座標へ変換して入力を計算する
+        if (spidar == null) return Vector2.zero;
+
+        Vector3 droneLocalPos = Quaternion.Inverse(RotationOffset) * (pose.position - PositionOffset);
 
         // --- 左右移動 (X-axis) ---
-        float relativeX = dronePointerTransform.localPosition.x;
-        // Normalize displacement to -1 ~ 1 range
+        float relativeX = droneLocalPos.x;
         float normalizedX = Mathf.Clamp(relativeX / maxDisplacement, -1.0f, 1.0f);
         float processedLeftRight = ApplyDeadzone(normalizedX, positionDeadzone);
+        processedLeftRight = ApplyResponseCurve(processedLeftRight);
 
         // --- 前後移動 (Z-axis) ---
-        float relativeZ = dronePointerTransform.localPosition.z;
-        // Normalize displacement to -1 ~ 1 range
+        float relativeZ = droneLocalPos.z;
         float normalizedZ = Mathf.Clamp(relativeZ / maxDisplacement, -1.0f, 1.0f);
         float processedForwardBack = ApplyDeadzone(normalizedZ, positionDeadzone);
+        processedForwardBack = ApplyResponseCurve(processedForwardBack);
 
-        // Apply sensitivity and clamp the final value to the -1 ~ 1 range
+ 
+        //Debug.Log($"[RightStick] In:{normalizedX:F2} Dead:{processedLeftRight:F2} Out:{processedLeftRight:F2}");
+        
+
         return new Vector2(
             Mathf.Clamp(processedLeftRight * rightLeftSensitivity, -1.0f, 1.0f),
             Mathf.Clamp(processedForwardBack * forwardBackSensitivity, -1.0f, 1.0f)
