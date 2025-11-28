@@ -34,7 +34,7 @@
 *.aab
 *.unitypackage
 *.app
-
+build/
 # クラッシュレポート時に生成されるファイル
 sysinfo.txt
 
