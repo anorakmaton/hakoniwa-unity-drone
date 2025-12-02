@@ -37,7 +37,6 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private Pose pose;
     private Pose prevPose;
     private Pose rawPose;
-    public bool basicForceFeedback = false;
     private uint triggerEnterCount = 0;
     private Rigidbody collidingObject = null;
     private Rigidbody holdingObject = null;
@@ -47,16 +46,17 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private int curHoldCount = 0;
     private int updateSkipCount = 0;
     private float holdStartTime = -1f;
-    private float lastSpidarLogTime = 0.0f;
     private int refreshFramesRemaining = 0;
     [Header("Debug")]
     public bool DebugAxisOutput = true;
     public float axisDebugInterval = 1.0f;
+    [Header("Button Channel Settings")]
     public int ArmChannel = 2; // Example channel for "Arm" button
     public int BButtonChannel = 5; // Example channel for "B" button
     public int XButtonChannel = 6; // Example channel for "X" button
     public int YButtonChannel = 7; // Example channel for "Y" button
-    
+    [Header("Haptic Settings")]
+    public bool basicForceFeedback = false;
     // [MODIFIED] Sensitivity Settingsを調整
     [Header("Sensitivity Settings")]
     public float maxDisplacement = 1.0f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
@@ -78,6 +78,8 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     private Quaternion initialDronePointerRotation;
 
     public Transform droneBody; // インスペクターからDroneBodyオブジェクトを設定
+    private Vector2 LeftStickInput = Vector2.zero;
+    private Vector2 RightStickInput = Vector2.zero;
 
     void Awake()
     {
@@ -365,23 +367,38 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         // X軸とY軸の入れ替え、Y軸反転に対応した回転変換
         Quaternion unityRot = new Quaternion(spidarRot.z, -spidarRot.y, spidarRot.x, spidarRot.w);
         
-        // ドローンの動きも反映
-        // if (droneBody != null)
-        // {
-        //     // ドローンの位置と回転を取得
-        //     Vector3 dronePosition = droneBody.position;
-        //     Quaternion droneRotation = droneBody.rotation;
-
-        //     // DronePointerの位置と回転にドローンの変化を加算
-        //     rawPose.position += new Vector3(dronePosition.x, dronePosition.y, dronePosition.z);
-        //     rawPose.rotation = droneRotation * rawPose.rotation;
-        // }
         if (clutchEngaged)
         {
             pose.position = RotationOffset * (unityPos + clutchedPositionOffset) + PositionOffset;
             pose.rotation = RotationOffset * unityRot;
             pose.velocity = RotationOffset * unityVel;
             pose.angularVelocity = RotationOffset * unityAvel;
+
+            // スティック入力に基づいて transform を更新する
+            // 左スティック: x=yaw, y=上下
+            // 右スティック: x=左右, y=前後
+            LeftStickInput = CalcLeftStickInput();
+            RightStickInput = CalcRightStickInput();
+
+            Vector3 localPosFromSticks = new Vector3(
+                RightStickInput.x * maxDisplacement * rightLeftSensitivity,
+                LeftStickInput.y * maxDisplacement * upDownSensitivity,
+                RightStickInput.y * maxDisplacement * forwardBackSensitivity
+            );
+
+            Vector3 worldPos = RotationOffset * localPosFromSticks + PositionOffset;
+
+            float yawAngle = LeftStickInput.x * yawMaxAngle * yawSensitivity; // degrees
+            Quaternion yawRot = Quaternion.Euler(0f, yawAngle, 0f);
+
+            Quaternion worldRot = RotationOffset * yawRot;
+
+            transform.position = worldPos;
+            transform.rotation = worldRot;
+            //Debug.Log($"[SPIDAR][HakoDrone] LeftStick: {LeftStickInput}, RightStick: {RightStickInput}, Pos: {transform.position}, Rot: {transform.rotation.eulerAngles}");
+            // 他の処理のために pose も同期しておく
+            pose.position = transform.position;
+            pose.rotation = transform.rotation;
         }
         else
         {
@@ -389,10 +406,10 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
             pose.rotation = RotationOffset * clutchedRotation;
             pose.velocity = Vector3.zero;
             pose.angularVelocity = Vector3.zero;
-        }
 
-        transform.localPosition = pose.position;
-        transform.localRotation = pose.rotation;
+            transform.position = RotationOffset * clutchedPosition + PositionOffset;
+            transform.rotation = RotationOffset * clutchedRotation;
+        }
     }
     void SetSpidarForce()
     {
@@ -582,7 +599,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
 
 
     // [MODIFIED] GetLeftStickInputの実装
-    public Vector2 GetLeftStickInput()
+    public Vector2 CalcLeftStickInput()
     {
         // SPIDAR の pose を基準にドローン局所座標へ変換して入力を計算する
         if (spidar == null) return Vector2.zero;
@@ -614,7 +631,7 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
     }
 
     // GetRightStickInputの実装
-    public Vector2 GetRightStickInput()
+    public Vector2 CalcRightStickInput()
     {
         // SPIDAR の pose を基準にドローン局所座標へ変換して入力を計算する
         if (spidar == null) return Vector2.zero;
@@ -638,9 +655,18 @@ public class HakoDroneSpidarInputManager : HapticPointerBase, IDroneInput
         
 
         return new Vector2(
-            Mathf.Clamp(processedLeftRight * rightLeftSensitivity, -1.0f, 1.0f),
-            Mathf.Clamp(processedForwardBack * forwardBackSensitivity, -1.0f, 1.0f)
+            Mathf.Clamp(processedLeftRight, -1.0f, 1.0f),
+            Mathf.Clamp(processedForwardBack, -1.0f, 1.0f)
         );
+    }
+
+    public Vector2 GetLeftStickInput()
+    {
+        return LeftStickInput;
+    }
+    public Vector2 GetRightStickInput()
+    {
+        return RightStickInput;
     }
 
     public bool IsAButtonPressed() {
