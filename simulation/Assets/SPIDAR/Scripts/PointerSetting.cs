@@ -398,6 +398,11 @@ public class PointerSetting : MonoBehaviour
             ShowLabeledItem("Arm channel", ref hakoDroneManager.ArmChannel, true);
         }
 
+        GUILayout.Label("Drone Pointer専用設定");
+        if (hakoDroneManager != null)
+        {
+            ShowLabeledItem("Basic Force Feedback", ref hakoDroneManager.basicForceFeedback, true);
+        }
         GUILayout.Space(10);
         if (GUILayout.Button("Revert to the default"))
         {
