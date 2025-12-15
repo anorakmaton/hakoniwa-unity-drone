@@ -16,6 +16,11 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         new Keyframe(0f, 0f, 0f, 0f),      // 開始点 (入力0 -> 出力0, 接線フラット)
         new Keyframe(1f, 1f, 2f, 0f)       // 終了点 (入力1 -> 出力1, 接線急角度)
     );
+    [Header("Wind Simulation Settings")]
+    public bool enableWind = false;     // インスペクターでON/OFF切り替え
+    public float windStrength = 0.3f;   // 風の強さ（最大入力に対する割合）
+    public float windFrequency = 0.5f;  // 風向きが変わる速さ
+    private Vector2 currentWind = Vector2.zero; // 現在の風ベクトル
 
     public Mesh     FistMesh            = null;
     public Mesh     PalmMesh            = null;
@@ -70,6 +75,7 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     // [ADDED] DronePointerへの参照と初期状態を保持する変数を追加
     [Header("Drone Control Target")]
     public Rigidbody dronePointer; // インスペクターからDronePointerオブジェクトを設定
+    public Rigidbody hapticShield;
     public Transform dronePointerTransform; // インスペクターからDronePointerオブジェクトを設定
 
     public Transform droneBody; // インスペクターからDroneBodyオブジェクトを設定
@@ -157,6 +163,8 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         // スペースキーが押されたときにもCalibrateを実行
         if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             Calibrate();
+
+        UpdateWind();
 
     }
 
@@ -508,10 +516,12 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
  
         //Debug.Log($"[RightStick] In:{normalizedX:F2} Dead:{processedLeftRight:F2} Out:{processedLeftRight:F2}");
         
-
+        // 風の影響を加算
+        float finalX = processedLeftRight + currentWind.x;
+        float finalZ = processedForwardBack + currentWind.y;
         return new Vector2(
-            Mathf.Clamp(processedLeftRight, -1.0f, 1.0f),
-            Mathf.Clamp(processedForwardBack, -1.0f, 1.0f)
+            Mathf.Clamp(finalX, -1.0f, 1.0f),
+            Mathf.Clamp(finalZ, -1.0f, 1.0f)
         );
     }
 
@@ -551,6 +561,21 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         }
         PointerParameter parameter = new PointerParameter(this);
         parameter.serialize();
+    }
+
+    void UpdateWind()
+    {
+        if (!enableWind)
+        {
+            currentWind = Vector2.zero;
+            return;
+        }
+
+        // 時間経過で滑らかに変化するノイズを生成 (0.0~1.0 -> -1.0~1.0 に変換)
+        float noiseX = Mathf.PerlinNoise(Time.time * windFrequency, 0f) * 2f - 1f;
+        float noiseY = Mathf.PerlinNoise(0f, Time.time * windFrequency) * 2f - 1f;
+
+        currentWind = new Vector2(noiseX, noiseY) * windStrength;
     }
 }
 
