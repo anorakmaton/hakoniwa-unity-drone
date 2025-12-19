@@ -2401,6 +2401,10 @@ MonoBehaviour:
   grabberObject: {fileID: 570867113}
   forceGrab: 0
   isPlayer: 0
+  enableWind: 0
+  windStrength: 0.3
+  windFrequency: 0.5
+  currentWind: {x: 0, y: 0}
   move_step: 0.1
   camera_move_button_threshold_speedup: 1
   is_pressed_up: 0
@@ -2867,7 +2871,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &662948594
 Transform:
   m_ObjectHideFlags: 0
@@ -10059,7 +10063,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &813045050
 Transform:
   m_ObjectHideFlags: 0
@@ -11083,7 +11087,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1053228468
 Transform:
   m_ObjectHideFlags: 0
@@ -11344,7 +11348,7 @@ Camera:
     m_Bits: 4294967295
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
-  m_TargetDisplay: 1
+  m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
   m_AllowMSAA: 1
@@ -11422,7 +11426,7 @@ Camera:
     m_Bits: 4294967295
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
-  m_TargetDisplay: 0
+  m_TargetDisplay: 1
   m_TargetEye: 3
   m_HDR: 1
   m_AllowMSAA: 1
@@ -11487,7 +11491,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1061526962
 Transform:
   m_ObjectHideFlags: 0
@@ -17801,7 +17805,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1500192064
 Transform:
   m_ObjectHideFlags: 0
@@ -18000,9 +18004,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  enableWind: 0
-  windStrength: 0.3
-  windFrequency: 0.5
+  currentForce: {x: 0, y: 0, z: 0}
   FistMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
   PalmMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
   DebugAxisOutput: 1
@@ -18020,8 +18022,8 @@ MonoBehaviour:
   yawMaxAngle: 45
   positionDeadzone: 0
   rotationDeadzone: 0.3
-  dronePointer: {fileID: 1296446418}
-  dronePointerTransform: {fileID: 1296446417}
+  hapticShieldRb: {fileID: 0}
+  dronePointerRb: {fileID: 0}
   droneBody: {fileID: 790990581}
 --- !u!1 &1506036393
 GameObject:
@@ -29526,7 +29528,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1878494131
 Transform:
   m_ObjectHideFlags: 0
@@ -30500,7 +30502,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &2118749082
 Transform:
   m_ObjectHideFlags: 0

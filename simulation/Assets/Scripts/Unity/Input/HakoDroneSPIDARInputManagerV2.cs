@@ -25,7 +25,8 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     public Rigidbody    CollidingObject { get { return collidingObject; } }
     public Vector3      PositionOffset  { get; set; }
     public Quaternion   RotationOffset  { get; set; }
-    private SpringDamperModel model = new SpringDamperModel();
+    private SpringDamperModel modelHS = new SpringDamperModel();
+    private SpringDamperModel modelDP = new SpringDamperModel();
     private Vector3 clutchedPositionOffset = Vector3.zero;
     private Vector3 clutchedPosition = Vector3.zero;
     private Quaternion clutchedRotation = Quaternion.identity;
@@ -35,7 +36,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     private Pose dronePose;
     private Pose prevDronePose;
     private Rigidbody collidingObject = null;
-    private Rigidbody holdingObject = null;
     private Renderer meshRenderer = null;
     private MeshFilter meshFilter = null;
     private bool curMultiHold = false;
@@ -53,6 +53,9 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     public int YButtonChannel = 7; // Example channel for "Y" button
     [Header("Haptic Settings")]
     public bool basicForceFeedback = false;
+    [Header("Enable/Disable Targets")]
+    public bool enableHapticShield = true;
+    public bool enableDronePointer = true;
     // [MODIFIED] Sensitivity Settingsを調整
     [Header("Sensitivity Settings")]
     public float maxDisplacement = 1.0f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
@@ -68,10 +71,8 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
     // [ADDED] DronePointerへの参照と初期状態を保持する変数を追加
     [Header("Drone Control Target")]
-    public Rigidbody dronePointer; // インスペクターからDronePointerオブジェクトを設定
-    public Rigidbody hapticShield;
-    public Transform dronePointerTransform; // インスペクターからDronePointerオブジェクトを設定
-
+    public Rigidbody hapticShieldRb; // インスペクターからDronePointerオブジェクトを設定
+    public Rigidbody dronePointerRb;
     public Transform droneBody; // インスペクターからDroneBodyオブジェクトを設定
     private Vector2 LeftStickInput = Vector2.zero;
     private Vector2 RightStickInput = Vector2.zero;
@@ -91,13 +92,12 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         PositionOffset = transform.position;
         RotationOffset = transform.rotation;
 
-        model.Clear();
+        modelHS.Clear();
 
         meshRenderer = GetComponent<MeshRenderer>();
         meshFilter = GetComponent<MeshFilter>();
 
         collidingObject = null;
-        holdingObject = null;
         HoldObject();
 
         meshFilter.mesh = PalmMesh;
@@ -115,30 +115,49 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     public bool HoldObject()
     {
         meshFilter.mesh = FistMesh;
-     
-        if (holdingObject != null)
-            return false;
-        holdingObject = dronePointer;
-        
-        // [ADDED] DronePointerを掴んだ時に、それが操作対象であることを確認
-        if (holdingObject == dronePointer)
+        bool enabledAny = false;
+
+        if (enableHapticShield)
         {
-            Debug.Log("✅ DronePointer is now being controlled.");
+            if (hapticShieldRb == null)
+            {
+                Debug.LogWarning("⚠️ DronePointer Rigidbody is not assigned in the Inspector.");
+            }
+            else
+            {
+                modelHS.Clear();
+                modelHS.SpringK = UnitySpringK;
+                modelHS.DamperB = UnityDamperB;
+                modelHS.pointerOrigin = dronePose;
+                modelHS.rigidbodyOrigin = (Pose)hapticShieldRb;
+                enabledAny = true;
+            }
         }
 
-        HoldState hs = GetHoldState();
-        hs.OnHoldObject();
+        if (enableDronePointer)
+        {
+            if (dronePointerRb == null)
+            {
+                Debug.LogWarning("⚠️ DronePointer Rigidbody is not assigned in the Inspector.");
+            }
+            else
+            {
+                modelDP.Clear();
+                modelDP.SpringK = UnitySpringK;
+                modelDP.DamperB = UnityDamperB;
+                modelDP.pointerOrigin = pose;
+                modelDP.rigidbodyOrigin = (Pose)dronePointerRb;
+                enabledAny = true;
+            }
+        }
 
-        model.Clear();
-        model.SpringK = UnitySpringK;
-        model.DamperB = UnityDamperB;
-        model.pointerOrigin = dronePose;
-        model.rigidbodyOrigin = (Pose)holdingObject;
+        if (enabledAny)
+        {
+            // 保持開始時刻を記録（定期リフレッシュ用）
+            holdStartTime = Time.time;
+        }
 
-        // 保持開始時刻を記録（定期リフレッシュ用）
-        holdStartTime = Time.time;
-
-        return true;
+        return enabledAny;
     }
 
     void Update()
@@ -193,16 +212,14 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
         spidar.Calibrate();
         
-        // DronePointerをドローンの中心（ローカル原点）に移動
-        if (dronePointer != null)
+        // hapticShieldをドローンの中心（ローカル原点）に移動
+        if (enableHapticShield && hapticShieldRb != null)
         {
-            // DronePointerをドローンのローカル原点(0, 0, 0)に移動
-            dronePointer.transform.localPosition = Vector3.zero;
-            dronePointer.transform.localRotation = Quaternion.identity;
+            // hapticShieldをドローンのローカル原点(0, 0, 0)に移動
+            hapticShieldRb.transform.localPosition = Vector3.zero;
+            hapticShieldRb.transform.localRotation = Quaternion.identity;
             
-            Debug.Log("✅ DronePointer moved to drone center and origin set.");
-        } else {
-            Debug.LogWarning("⚠️ DronePointer is not assigned in the Inspector.");
+            Debug.Log("✅ hapticShield moved to drone center and origin set.");
         }
 
         // --- 追加: キャリブレーション後にモデルとRigidbodyの原点・速度を同期 ---
@@ -212,21 +229,21 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         // 物理速度をクリアして不要な瞬間力を抑えます。
         try
         {
-            if (holdingObject != null && dronePointer != null && holdingObject == dronePointer)
+            if (enableHapticShield && hapticShieldRb != null)
             {
                 // 現在の pose に合わせて pointerOrigin を更新
-                model.pointerOrigin = dronePose;
+                modelHS.pointerOrigin = dronePose;
 
                 // Rigidbody 側の基準（位置・回転）も同期
-                model.rigidbodyOrigin = dronePose;
+                modelHS.rigidbodyOrigin = dronePose;
 
                 // 既に動いている速度をゼロにして、キャリブ後の瞬間的な力を抑える
-                holdingObject.linearVelocity = Vector3.zero;
-                holdingObject.angularVelocity = Vector3.zero;
+                hapticShieldRb.linearVelocity = Vector3.zero;
+                hapticShieldRb.angularVelocity = Vector3.zero;
 
                 // Rigidbody の内部状態を安定させるために transform も確実に同期
-                holdingObject.transform.localPosition = Vector3.zero;
-                holdingObject.transform.localRotation = Quaternion.identity;
+                hapticShieldRb.transform.localPosition = Vector3.zero;
+                hapticShieldRb.transform.localRotation = Quaternion.identity;
 
                 Debug.Log("🔧 Calibrate: synced model.pointerOrigin and cleared Rigidbody velocities for DronePointer.");
             }
@@ -235,6 +252,21 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         {
             Debug.LogWarning($"[Calibrate] sync failed: {ex.Message}");
         }
+
+        // DronePointer Rigidbody のキャリブレーション
+        if (enableDronePointer && dronePointerRb != null)
+        {
+            // 速度をゼロにして瞬間力を抑える
+            dronePointerRb.linearVelocity = Vector3.zero;
+            dronePointerRb.angularVelocity = Vector3.zero;
+
+            // transform も同期
+            dronePointerRb.transform.localPosition = Vector3.zero;
+            dronePointerRb.transform.localRotation = Quaternion.identity;
+
+            Debug.Log("🔧 Calibrate: synced modelDP.pointerOrigin and cleared Rigidbody velocities for DronePointer.");
+        }
+
     }
     
     void GetSpidarPose()
@@ -271,8 +303,7 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         Quaternion spidarRot = rawPose.rotation;
         // X軸とY軸の入れ替え、Y軸反転に対応した回転変換
         Quaternion unityRot = new Quaternion(spidarRot.z, -spidarRot.y, spidarRot.x, spidarRot.w);
-        
-    
+
         pose.position = RotationOffset * (unityPos + clutchedPositionOffset) + PositionOffset;
         pose.rotation = RotationOffset * unityRot;
         pose.velocity = RotationOffset * unityVel;
@@ -296,17 +327,20 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         Quaternion yawRot = Quaternion.Euler(0f, yawAngle, 0f);
 
         Quaternion worldRot = RotationOffset * yawRot;
-
-        transform.position = droneBody.position;
-        transform.rotation = droneBody.rotation;
-        //Debug.Log($"[SPIDAR][HakoDrone] LeftStick: {LeftStickInput}, RightStick: {RightStickInput}, Pos: {transform.position}, Rot: {transform.rotation.eulerAngles}");
-        // 他の処理のために pose も同期しておく
-        dronePose.position = transform.position;
-        dronePose.rotation = transform.rotation;
+        pose.position = worldPos;
+        pose.rotation = worldRot;
+        transform.position = pose.position;
+        transform.rotation = pose.rotation;
+        
+        dronePose.position = droneBody.position;
+        dronePose.rotation = droneBody.rotation;
     }
     void SetSpidarForce()
     {
         if (spidar == null)
+            return;
+
+        if (!enableHapticShield && !enableDronePointer)
             return;
 
         spidar.SetHaptics(Haptics);
@@ -347,8 +381,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
             return;
         }
 
-        if (holdingObject == null) return;
-
         Vector3 g = Vector3.zero;
 
         float deviceR2 = spidar.GetGripRadius() * spidar.GetGripRadius();
@@ -356,8 +388,25 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         float forceScale = DeviceSpringK / (UnitySpringK * PositionScale);
         float torqueScale = DeviceSpringK / (UnitySpringK * RotationScale);
 
-        Vector3 f = -model.CalcForce(dronePose, holdingObject) * forceScale;
-        Vector3 t = -model.CalcTorque(dronePose, holdingObject) * torqueScale * deviceR2;
+        // hapticShieldRbからの力を計算
+        Vector3 f = Vector3.zero;
+        Vector3 t = Vector3.zero;
+
+        // hapticShieldRbからの力を計算
+        if (enableHapticShield && hapticShieldRb != null)
+        {
+            f += -modelHS.CalcForce(dronePose, hapticShieldRb) * forceScale;
+            t += -modelHS.CalcTorque(dronePose, hapticShieldRb) * torqueScale * deviceR2;
+        }
+
+        // dronePointerRbからの力も加える
+        if (enableDronePointer && dronePointerRb != null)
+        {
+            Vector3 fDP = -modelDP.CalcForce(pose, dronePointerRb) * forceScale;
+            Vector3 tDP = -modelDP.CalcTorque(pose, dronePointerRb) * torqueScale * deviceR2;
+            f += fDP;
+            t += tDP;
+        }
 
         currentForce = f;
 
@@ -392,39 +441,47 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
     void SetObjectForce()
     {
-        if (holdingObject == null) return;
-
-        // 通常の物理力を適用
         float droneTimeStep = Time.fixedDeltaTime * Application.targetFrameRate;
-        Pose temp = Pose.Lerp(prevDronePose, dronePose, droneTimeStep);
-        //Debug.Log($"🔧 DronePointer Pose Lerp: PrevPos={prevPose.position}, CurrPos={pose.position}, LerpPos={dronePose.position}");
-        Vector3 droneForce = holdingObject.mass * model.CalcForce(temp, holdingObject);
-        Vector3 droneTorque = holdingObject.inertiaTensor.magnitude * 4 * model.CalcTorque(temp, holdingObject);
 
-        if (curMultiHold)
+        bool applied = false;
+
+        /////////////////////////////////////
+        ////// hapticShieldRbに力を適用 //////
+        /////////////////////////////////////
+        if (enableHapticShield && hapticShieldRb != null)
         {
-            droneForce /= (float)curHoldCount;
-            droneTorque /= (float)curHoldCount;
+            Pose temp = Pose.Lerp(prevDronePose, dronePose, droneTimeStep);
+            Vector3 droneForce = hapticShieldRb.mass * modelHS.CalcForce(temp, hapticShieldRb);
+            Vector3 droneTorque = hapticShieldRb.inertiaTensor.magnitude * 4 * modelHS.CalcTorque(temp, hapticShieldRb);
+
+            if (curMultiHold)
+            {
+                droneForce /= (float)curHoldCount;
+                droneTorque /= (float)curHoldCount;
+            }
+
+            hapticShieldRb.AddForce(droneForce);
+            hapticShieldRb.AddTorque(droneTorque);
+            applied = true;
         }
 
-        holdingObject.AddForce(droneForce);
-        holdingObject.AddTorque(droneTorque);
+        /////////////////////////////////////
+        ////// dronePointerRbに力を適用 //////
+        /////////////////////////////////////
+        if (enableDronePointer && dronePointerRb != null)
+        {
+            Pose temp = Pose.Lerp(prevPose, pose, droneTimeStep);
+            Vector3 droneForce = dronePointerRb.mass * modelDP.CalcForce(temp, dronePointerRb);
+            Vector3 droneTorque = dronePointerRb.inertiaTensor.magnitude * 4 * modelDP.CalcTorque(temp, dronePointerRb);
 
-        //Debug.Log($"🔧 Applied force to holding object: {holdingObject.name}, Force: {droneForce}, Torque: {droneTorque}");
+            dronePointerRb.AddForce(droneForce);
+            dronePointerRb.AddTorque(droneTorque);
+            applied = true;
+        }
 
-        return;
+        if (!applied) return;
     }
-    HoldState GetHoldState()
-    {
-        GameObject obj = holdingObject.gameObject;
-        HoldState [] hsList = obj.GetComponents<HoldState>();
-        for (int i = 0; i < hsList.Length; ++i)
-            if (hsList[i].Owner == this)
-                return hsList[i];
-        HoldState hs = obj.AddComponent<HoldState>();
-        hs.Owner = this;
-        return hs;
-    }
+
     private float ApplyDeadzone(float value, float threshold)
     {
         if (Mathf.Abs(value) < threshold)
@@ -443,16 +500,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         // 符号を元に戻して返す (-1.0 ～ 1.0)
         return Mathf.Sign(value) * curvedValue;
     }
-
-    void RemoveHoldState()
-    {
-        GameObject obj = holdingObject.gameObject;
-        HoldState[] hsList = obj.GetComponents<HoldState>();
-        for (int i = 0; i < hsList.Length; ++i)
-            if (hsList[i].Owner == this)
-                Destroy(hsList[i]);
-    }
-
 
     // [MODIFIED] GetLeftStickInputの実装
     public Vector2 CalcLeftStickInput()

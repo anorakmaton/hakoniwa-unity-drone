@@ -286,7 +286,7 @@ namespace hakoniwa.drone
             float noiseY = Mathf.PerlinNoise(0f, Time.time * windFrequency) * 2f - 1f;
 
             currentWind = new Vector2(noiseX, noiseY) * windStrength;
-            Debug.Log($"🌬️ Wind Updated: {currentWind}");
+            //Debug.Log($"🌬️ Wind Updated: {currentWind}");
         }
 
     }
