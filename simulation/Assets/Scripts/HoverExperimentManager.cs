@@ -176,8 +176,7 @@ public class HoverExperimentManager : MonoBehaviour
         Vector3 vel = droneRigidbody.linearVelocity;
         // ターゲットからの距離 (RMSE計算用)
         float dist = Vector3.Distance(pos, targetZoneCenter.position);
-        Debug.Log($"Recording Log at Time: {currentTime:F2}s, Pos: {pos}, Vel: {vel}, DistToTarget: {dist:F2}m");
-        
+       
         // 入力値と風ベクトルの取得 (DroneControl経由)
         Vector2 inputRight = Vector2.zero;
         Vector2 inputLeft = Vector2.zero;
