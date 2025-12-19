@@ -4,6 +4,8 @@ using UnityEngine.InputSystem;
 using System.IO;
 using System.Text;
 using System;
+using hakoniwa.objects.core;
+using hakoniwa.drone;
 
 public class HoverExperimentManager : MonoBehaviour
 {
@@ -29,9 +31,13 @@ public class HoverExperimentManager : MonoBehaviour
 
     [Header("References")]
     public Transform droneTransform;         // ドローン本体
+    public Rigidbody droneRigidbody;       // ドローンのRigidbody
     public Transform targetZoneCenter;       // ターゲット(青い箱)の中心
     public Text statusText;                  // 画面表示用テキスト (UI)
     public Text timerText;                   // タイマー表示用テキスト (UI)
+    public DroneControl droneControl;        // ドローン制御マネージャー
+    private Vector2 currentWind = Vector2.zero; // 現在の風ベクトル
+    private Vector3 currentForce = Vector3.zero; // 現在の力ベクトル
     public GameObject HapticWall;
     // 内部状態
     private bool isRunning = false;
@@ -39,6 +45,7 @@ public class HoverExperimentManager : MonoBehaviour
     private float currentTime = 0f;
     private StringBuilder logData;
     private string csvFilePath;
+    private IDroneInput controller_input;
 
     void Start()
     {
@@ -54,7 +61,7 @@ public class HoverExperimentManager : MonoBehaviour
 
         // ログヘッダー作成
         logData = new StringBuilder();
-        logData.AppendLine("Time,PosX,PosY,PosZ,DistToTarget,InputX,InputY,CollisionCount");
+        logData.AppendLine("Time,PosX,PosY,PosZ,VelX,VelY,VelZ,DistToTarget,InputRightX,InputRightY,InputLeftX,InputLeftY,WindX,WindY,ForceX,ForceY,ForceZ,CollisionCount");
 
         UpdateUI("Move to Target Zone");
 
@@ -63,6 +70,9 @@ public class HoverExperimentManager : MonoBehaviour
         {
             HapticWall.SetActive(false);
         }
+
+        // コントローラー入力の取得
+        
     }
 
     void Update()
@@ -126,10 +136,10 @@ public class HoverExperimentManager : MonoBehaviour
         currentTime = 0f;
         UpdateUI("KEEP POSITION!");
         
-        // 風を有効化 (SPIDAR Input Managerへの参照が必要)
-        if (HakoDroneSpidarInputManagerV2.Instance != null)
+        // 風を有効化 (DroneControl経由)
+        if (droneControl != null)
         {
-            HakoDroneSpidarInputManagerV2.Instance.enableWind = true;
+            droneControl.enableWind = true;
         }
 
         if (HapticWall != null)
@@ -148,9 +158,9 @@ public class HoverExperimentManager : MonoBehaviour
         timerText.text = "Time: 0.0";
 
         // 風を停止
-        if (HakoDroneSpidarInputManagerV2.Instance != null)
+        if (droneControl != null)
         {
-            HakoDroneSpidarInputManagerV2.Instance.enableWind = false;
+            droneControl.enableWind = false;
         }
 
         // CSV書き出し
@@ -162,21 +172,38 @@ public class HoverExperimentManager : MonoBehaviour
     {
         // 現在のドローン位置
         Vector3 pos = droneTransform.position;
+        // 現在のドローンの速度
+        Vector3 vel = droneRigidbody.linearVelocity;
         // ターゲットからの距離 (RMSE計算用)
         float dist = Vector3.Distance(pos, targetZoneCenter.position);
+        Debug.Log($"Recording Log at Time: {currentTime:F2}s, Pos: {pos}, Vel: {vel}, DistToTarget: {dist:F2}m");
         
-        // 入力値の取得
+        // 入力値と風ベクトルの取得 (DroneControl経由)
         Vector2 inputRight = Vector2.zero;
-        if (HakoDroneSpidarInputManagerV2.Instance != null)
+        Vector2 inputLeft = Vector2.zero;
+        if (droneControl != null)
         {
-            inputRight = HakoDroneSpidarInputManagerV2.Instance.GetRightStickInput();
+            var droneInput = droneControl.GetDroneInput();
+            if (droneInput != null)
+            {
+                inputRight = droneInput.GetRightStickInput();
+                inputLeft = droneInput.GetLeftStickInput();
+                
+                // currentForce の取得 (SPIDAR使用時のみ)
+                var spidarInput = droneInput as HakoDroneSpidarInputManagerV2;
+                if (spidarInput != null)
+                {
+                    currentForce = spidarInput.currentForce;
+                }
+            }
+            currentWind = droneControl.currentWind;
         }
 
         // 衝突回数 (必要ならInputManagerにカウンタ変数を追加してここから読む)
         int collision = 0; 
 
         // CSV行追加
-        string line = $"{currentTime},{pos.x},{pos.y},{pos.z},{dist},{inputRight.x},{inputRight.y},{collision}";
+        string line = $"{currentTime},{pos.x},{pos.y},{pos.z},{vel.x},{vel.y},{vel.z},{dist},{inputRight.x},{inputRight.y},{inputLeft.x},{inputLeft.y},{currentWind.x},{currentWind.y},{currentForce.x},{currentForce.y},{currentForce.z},{collision}";
         logData.AppendLine(line);
     }
 
@@ -188,27 +215,36 @@ public class HoverExperimentManager : MonoBehaviour
     // 条件に応じた設定の適用
     void ApplyConditionSettings()
     {
-        var spidarManager = HakoDroneSpidarInputManagerV2.Instance;
-        if (spidarManager == null) return;
+        if (droneControl == null) return;
 
         switch (condition)
         {
             case ExperimentCondition.PS4_Controller:
-                // PS4の場合: SPIDARの力を無効化、あるいは入力を無視する設定
-                // ※ここでは「PS4用の操作スクリプトが別にある」または「SPIDARスクリプトが入力を受け付けるが力は出さない」と仮定
-                spidarManager.enableWind = false; // スタートまでは風なし
-                spidarManager.Haptics = false;    // 力覚なし
-                // 必要であれば spidarManager.enabled = false; など
+                // PS4コントローラーに設定
+                droneControl.SetInputType(DroneControlInputType.PS4);
+                droneControl.enableWind = false; // スタートまでは風なし
                 break;
 
             case ExperimentCondition.SPIDAR_NoForce:
-                spidarManager.enableWind = false;
-                spidarManager.Haptics = false;    // 力覚OFF
+                // SPIDARに設定して力覚OFF
+                droneControl.SetInputType(DroneControlInputType.SPIDARV2);
+                droneControl.enableWind = false;
+                var droneInputNoForce = droneControl.GetDroneInput() as HakoDroneSpidarInputManagerV2;
+                if (droneInputNoForce != null)
+                {
+                    droneInputNoForce.Haptics = false;    // 力覚OFF
+                }
                 break;
 
             case ExperimentCondition.SPIDAR_WithForce:
-                spidarManager.enableWind = false;
-                spidarManager.Haptics = true;     // 力覚ON
+                // SPIDARに設定して力覚ON
+                droneControl.SetInputType(DroneControlInputType.SPIDARV2);
+                droneControl.enableWind = false;
+                var droneInputWithForce = droneControl.GetDroneInput() as HakoDroneSpidarInputManagerV2;
+                if (droneInputWithForce != null)
+                {
+                    droneInputWithForce.Haptics = true;     // 力覚ON
+                }
                 break;
         }
     }

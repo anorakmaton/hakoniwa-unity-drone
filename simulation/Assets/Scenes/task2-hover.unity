@@ -543,14 +543,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   subjectName: Subject_A
-  condition: 0
+  condition: 2
   taskDuration: 30
   startZoneRadius: 0.5
   droneTransform: {fileID: 790990581}
+  droneRigidbody: {fileID: 790990580}
   targetZoneCenter: {fileID: 672627033}
   statusText: {fileID: 1317127938}
   timerText: {fileID: 1719853545}
-  HapticWall: {fileID: 0}
+  HapticWall: {fileID: 2130774384}
 --- !u!4 &137641255
 Transform:
   m_ObjectHideFlags: 0
@@ -1951,7 +1952,6 @@ Transform:
   - {fileID: 825542520}
   - {fileID: 239609055}
   - {fileID: 672627033}
-  - {fileID: 2130774385}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &510419781
@@ -2901,10 +2901,11 @@ Transform:
   m_GameObject: {fileID: 672627032}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: 0}
+  m_LocalPosition: {x: 0, y: 1.5, z: 1.5}
   m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2130774385}
   m_Father: {fileID: 468877311}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &672627034
@@ -2980,7 +2981,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &698295909
 Transform:
   m_ObjectHideFlags: 0
@@ -10027,7 +10028,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -11183,7 +11184,7 @@ Camera:
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 60
-  orthographic: 1
+  orthographic: 0
   orthographic size: 1.01
   m_Depth: -1
   m_CullingMask:
@@ -12145,21 +12146,29 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 790990581}
     m_Modifications:
+    - target: {fileID: 134039284986675535, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3337637979040538354, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
+      propertyPath: m_Mass
+      value: 0.001
+      objectReference: {fileID: 0}
     - target: {fileID: 3337637979040538354, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
       propertyPath: m_UseGravity
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4197465847925377891, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.5
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 4197465847925377891, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.5
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 4197465847925377891, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.5
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 4197465847925377891, guid: 2acadfaed4c83d6489efc023b088bdd6, type: 3}
       propertyPath: m_LocalPosition.x
@@ -17699,8 +17708,8 @@ MonoBehaviour:
   Haptics: 0
   DebugMode: 0
   Gravity: 0
-  UnitySpringK: 2000
-  UnityDamperB: 100
+  UnitySpringK: 200
+  UnityDamperB: 10
   PositionScale: 2
   RotationScale: 2
   DeviceSpringK: 200
@@ -17739,6 +17748,8 @@ MonoBehaviour:
   enableWind: 0
   windStrength: 0.3
   windFrequency: 0.5
+  currentWind: {x: 0, y: 0}
+  currentForce: {x: 0, y: 0, z: 0}
   FistMesh: {fileID: 0}
   PalmMesh: {fileID: 0}
   DebugAxisOutput: 1
@@ -17757,6 +17768,7 @@ MonoBehaviour:
   positionDeadzone: 0
   rotationDeadzone: 0.3
   dronePointer: {fileID: 1296446418}
+  hapticShield: {fileID: 0}
   dronePointerTransform: {fileID: 1296446417}
   droneBody: {fileID: 790990581}
 --- !u!1 &1506036393
@@ -30041,9 +30053,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2130774384}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -1.875, z: 0}
+  m_LocalScale: {x: 1.25, y: 1.25, z: 1.25}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 128117889}
@@ -30052,7 +30064,7 @@ Transform:
   - {fileID: 724205099}
   - {fileID: 1954985128}
   - {fileID: 1447992702}
-  m_Father: {fileID: 468877311}
+  m_Father: {fileID: 672627033}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2132690258
 GameObject:

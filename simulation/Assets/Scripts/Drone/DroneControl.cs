@@ -43,6 +43,11 @@ namespace hakoniwa.drone
         public bool forceGrab = false;
         private IDroneControlOp droneControlOp = null;
         public bool isPlayer = true;
+        [Header("Wind Simulation Settings")]
+        public bool enableWind = false;
+        public float windStrength = 0.3f;   // 風の強さ（最大入力に対する割合）
+        public float windFrequency = 0.5f;  // 風向きが変わる速さ
+        public Vector2 currentWind = Vector2.zero; // 現在の風ベクトル
 
         public IDroneInput GetDroneInput()
         {
@@ -53,6 +58,14 @@ namespace hakoniwa.drone
         {
             return magnet_on;
         }
+
+        // 入力タイプを設定し、controller_inputを初期化する
+        public void SetInputType(DroneControlInputType type)
+        {
+            input_type = type;
+            InitializeControllerInput();
+        }
+
         private void Awake()
         {
             droneControlOp = this.GetComponentInChildren<IDroneControlOp>();
@@ -71,6 +84,11 @@ namespace hakoniwa.drone
                 Debug.Log("Gabber is not found.");
             }
 
+            InitializeControllerInput();
+        }
+
+        private void InitializeControllerInput()
+        {
             if (input_type == DroneControlInputType.PS4)
             {
                 controller_input = HakoDroneInputManager.Instance;
@@ -163,13 +181,22 @@ namespace hakoniwa.drone
         }
         public void HandleInput()
         {
+            UpdateWind();
             Vector2 leftStick = controller_input.GetLeftStickInput();
             Vector2 rightStick = controller_input.GetRightStickInput();
+            if (enableWind)
+            {
+                // 風の影響を右スティック入力に加算
+                rightStick.x += currentWind.x;
+                rightStick.y += currentWind.y;
+                // 入力範囲を-1.0から1.0にクランプ
+                rightStick.x = Mathf.Clamp(rightStick.x, -1.0f, 1.0f);
+                rightStick.y = Mathf.Clamp(rightStick.y, -1.0f, 1.0f);
+            }
             float horizontal = rightStick.x;
             float forward = rightStick.y;
             float yaw = leftStick.x;
             float pitch = leftStick.y;
-
             bool mag_on = false;
             bool mag_req = droneControlOp.GetMagnetRequest(out mag_on);
             if (controller_input.IsAButtonPressed())
@@ -244,6 +271,22 @@ namespace hakoniwa.drone
             droneControlOp.PutVertical(0, -pitch * stick_strength);
 
             droneControlOp.DoFlush();
+        }
+
+        void UpdateWind()
+        {
+            if (!enableWind)
+            {
+                currentWind = Vector2.zero;
+                return;
+            }
+
+            // 時間経過で滑らかに変化するノイズを生成 (0.0~1.0 -> -1.0~1.0 に変換)
+            float noiseX = Mathf.PerlinNoise(Time.time * windFrequency, 0f) * 2f - 1f;
+            float noiseY = Mathf.PerlinNoise(0f, Time.time * windFrequency) * 2f - 1f;
+
+            currentWind = new Vector2(noiseX, noiseY) * windStrength;
+            Debug.Log($"🌬️ Wind Updated: {currentWind}");
         }
 
     }
