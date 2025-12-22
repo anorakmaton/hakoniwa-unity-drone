@@ -49,6 +49,9 @@ namespace hakoniwa.drone
         public float windFrequency = 0.5f;  // 風向きが変わる速さ
         public Vector2 currentWind = Vector2.zero; // 現在の風ベクトル
 
+        [Header("Control Restrictions")]
+        public bool restrictHorizontalControl = false; // Takeoffフェーズ用: trueの場合、上昇下降(Throttle)以外の操作を無効化する
+
         public IDroneInput GetDroneInput()
         {
             return controller_input;
@@ -111,7 +114,7 @@ namespace hakoniwa.drone
             }
         }
 
-        public float move_step = 1.0f;  // ���̓����̃X�e�b�v��
+        public float move_step = 1.0f;  // ̓̃Xebv
         private float camera_move_button_time_duration = 0f;
         public float camera_move_button_threshold_speedup = 1.0f;
         public bool is_pressed_up = false;
@@ -184,6 +187,16 @@ namespace hakoniwa.drone
             UpdateWind();
             Vector2 leftStick = controller_input.GetLeftStickInput();
             Vector2 rightStick = controller_input.GetRightStickInput();
+
+            // [変更] 水平操作制限が有効な場合、入力値をマスクする
+            if (restrictHorizontalControl)
+            {
+                // 左スティックのX（Yaw/旋回）を無効化、Y（Throttle/上昇下降）は維持
+                leftStick.x = 0f;
+                // 右スティック（Pitch/Roll/水平移動）を完全に無効化
+                rightStick = Vector2.zero;
+            }
+
             if (enableWind)
             {
                 // 風の影響を右スティック入力に加算

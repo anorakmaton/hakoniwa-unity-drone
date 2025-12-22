@@ -1,6 +1,7 @@
 using UnityEngine;
 using hakoniwa.drone.service;
 using hakoniwa.objects.core;
+using System; // Action用に必要
 
 namespace hakoniwa.drone
 {
@@ -45,6 +46,9 @@ namespace hakoniwa.drone
         private bool isHakoniwa = false;
         public DroneControl vibration;
         private IDroneInput vibrationObject;
+
+        // ★追加: 衝突を外部（実験マネージャー等）に通知するイベント
+        public Action<Collider> OnCollisionEnterAction;
 
         private DroneImpulseCollision impluse_collision = new DroneImpulseCollision();
         public DroneImpulseCollision GetImpulseCollision()
@@ -94,6 +98,9 @@ namespace hakoniwa.drone
             // レイヤーマスクに基づいて対象をフィルタリング
             if (IsLayerInMask(other.gameObject.layer, collisionLayer))
             {
+                // ★追加: イベント発火（購読者がいれば通知）
+                OnCollisionEnterAction?.Invoke(other);
+
                 TargetColliderInfo info = TargetColliderInfo.GetInfo(other);
                 if (info != null)
                 {

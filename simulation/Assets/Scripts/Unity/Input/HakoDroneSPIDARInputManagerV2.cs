@@ -56,9 +56,15 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
     [Header("Enable/Disable Targets")]
     public bool enableHapticShield = true;
     public bool enableDronePointer = true;
+    
+    // [ADDED] マスター制御フラグ: falseの場合、力覚計算と物理干渉を完全に停止する
+    [Header("Master Control")]
+    public bool isControlActive = true; 
+
     // [MODIFIED] Sensitivity Settingsを調整
     [Header("Sensitivity Settings")]
-    public float maxDisplacement = 1.0f; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
+    public Vector3 maxDisplacement; // スティック入力が最大(-1 or 1)になるDronePointerの移動距離(m)
+    private Vector3 spidarMaxDisplacement = new Vector3(0.08f, 0.05f, 0.08f); // SPIDARの最大移動距離(m)
     public float upDownSensitivity = 1.0f;
     public float forwardBackSensitivity = 1.0f;
     public float rightLeftSensitivity = 1.0f;
@@ -104,12 +110,27 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
         requestInit = !Initialize();
         
-        // // [MODIFIED] Start時に一度キャリブレーションを実行
-        // // これにより、起動時のDronePointerの位置が原点になる
-        // if (spidar != null)
-        // {
-        //     Calibrate();
-        // }
+        maxDisplacement = new Vector3(
+            spidarMaxDisplacement.x * PositionScale,
+            spidarMaxDisplacement.y * PositionScale,
+            spidarMaxDisplacement.z * PositionScale
+        );
+        Debug.Log($"[SPIDAR][HakoDrone] maxDisplacement set to {maxDisplacement} based on PositionScale {PositionScale}");
+    }
+
+    // [ADDED] 外部から制御の有効/無効を切り替えるメソッド
+    public void SetControlActive(bool active)
+    {
+        isControlActive = active;
+        if (!active)
+        {
+            if (spidar != null) spidar.ClearForce();
+            Debug.Log("[SPIDAR][HakoDrone] Control Disabled (Force Cleared)");
+        }
+        else
+        {
+            Debug.Log("[SPIDAR][HakoDrone] Control Enabled");
+        }
     }
 
     public bool HoldObject()
@@ -173,18 +194,21 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         if (GetGpioDown(CalibrationChannel))
             Calibrate();
 
-        // スペースキーが押されたときにもCalibrateを実行
-        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-            Calibrate();
     }
 
     void FixedUpdate()
     {
         if (spidar != null)
         {
+            // 位置取得は常に行う（ログ記録やデバッグ表示のため）
             GetSpidarPose();
-            SetSpidarForce();
-            SetObjectForce();
+
+            // [MODIFIED] マスターフラグが有効な場合のみ、力覚計算と物理干渉を行う
+            if (isControlActive)
+            {
+                SetSpidarForce();
+                SetObjectForce();
+            }
         }
     }
 
@@ -223,10 +247,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         }
 
         // --- 追加: キャリブレーション後にモデルとRigidbodyの原点・速度を同期 ---
-        // 非kinematicのRigidbodyには以前のモデル差分からの力が残っている可能性があり、
-        // それが原因でキャリブレーション直後に押し出される挙動が発生します。
-        // ここで holdingObject が DronePointer であれば、モデルの原点を更新し、
-        // 物理速度をクリアして不要な瞬間力を抑えます。
         try
         {
             if (enableHapticShield && hapticShieldRb != null)
@@ -288,7 +308,7 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         rawPose.rotation = Converter.ScaleUp(Converter.Convert(rot), RotationScale);
         rawPose.velocity = Converter.ScaleUp(Converter.Convert(vel), PositionScale);
         rawPose.angularVelocity = Converter.ScaleUp(Converter.Convert(avel), RotationScale);
-
+        
         // [FIXED] SPIDAR座標系からUnity座標系への変換
         Vector3 spidarPos = rawPose.position;
         Vector3 unityPos = new Vector3(spidarPos.z, -spidarPos.y, spidarPos.x);
@@ -308,17 +328,17 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         pose.rotation = RotationOffset * unityRot;
         pose.velocity = RotationOffset * unityVel;
         pose.angularVelocity = RotationOffset * unityAvel;
-        //Debug.Log($"[SPIDAR][HakoDrone] RawPose Pos: {rawPose.position}, Rot: {rawPose.rotation.eulerAngles}");
+        
         // スティック入力に基づいて transform を更新する
         // 左スティック: x=yaw, y=上下
         // 右スティック: x=左右, y=前後
         LeftStickInput = CalcLeftStickInput();
         RightStickInput = CalcRightStickInput();
-        //Debug.Log($"[SPIDAR][HakoDrone] LeftStickInput: {LeftStickInput}, RightStickInput: {RightStickInput}");
+        
         Vector3 localPosFromSticks = new Vector3(
-            RightStickInput.x * maxDisplacement * rightLeftSensitivity,
-            LeftStickInput.y * maxDisplacement * upDownSensitivity,
-            RightStickInput.y * maxDisplacement * forwardBackSensitivity
+            RightStickInput.x * maxDisplacement.x * rightLeftSensitivity,
+            LeftStickInput.y * maxDisplacement.y * upDownSensitivity,
+            RightStickInput.y * maxDisplacement.z * forwardBackSensitivity
         );
 
         Vector3 worldPos = RotationOffset * localPosFromSticks + PositionOffset;
@@ -346,20 +366,10 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         spidar.SetHaptics(Haptics);
         spidar.SetCascadeGain(CascadeGain);
 
-        // デバッグ出力（10秒毎）と定期リフレッシュ（長時間ホールドでデバイスが出力を止める回避）
-        // if (Time.time - lastSpidarLogTime >= 10.0f)
-        // {
-        //     float hold = (holdStartTime > 0f) ? Time.time - holdStartTime : -1f;
-        //     string holdStr = (hold >= 0f) ? $"{hold:F1}s" : "not holding";
-        //     bool spidarIsNull = (spidar == null);
-        //     Debug.Log($"[SPIDAR][HakoDrone] Time={Time.time:F1}, holdStart={holdStartTime:F1}, holdTime={holdStr}, refreshFrames={refreshFramesRemaining}, spidarNull={spidarIsNull}");
-        //     lastSpidarLogTime = Time.time;
-        // }
-
         // 120秒以上力覚提示を行うとSPIDARが力覚出力を停止する問題への対策
         const float refreshStart = 110f; // 閾値（秒）
         // 閾値越えで次の5フレーム連続で ClearForce を送る
-        if (holdStartTime > 0 && Time.time - holdStartTime > refreshStart && refreshFramesRemaining == 0)
+        if (holdStartTime >= 0 && Time.time - holdStartTime > refreshStart && refreshFramesRemaining == 0)
         {
             Debug.Log("[SPIDAR][HakoDrone] Hold refresh triggered: clearing force for 5 frames.");
             refreshFramesRemaining = 5;
@@ -435,7 +445,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
             f += spidarForce;
             t += spidarTorque;
         }
-        //Debug.Log($"🔧 SPIDAR Force: {f}, Torque: {t}");
         spidar.SetForce(Converter.Convert(f + g), forceK, forceB, Converter.Convert(t), torqueK, torqueB, false, CascadeControl);
     }
 
@@ -512,7 +521,7 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
         // --- 上下移動 (Y-axis) ---
         float relativeY = droneLocalPos.y;
-        float normalizedY = Mathf.Clamp(relativeY / maxDisplacement, -1.0f, 1.0f);
+        float normalizedY = Mathf.Clamp(relativeY / maxDisplacement.y, -1.0f, 1.0f);
         float processedUpDown = ApplyDeadzone(normalizedY, positionDeadzone);
 
         // --- ヨー操作 (Yaw) ---
@@ -521,11 +530,6 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         if (yaw > 180f) yaw -= 360f;
         float normalizedYaw = Mathf.Clamp(yaw / yawMaxAngle, -1.0f, 1.0f);
         float processedYaw = ApplyDeadzone(normalizedYaw, rotationDeadzone);
-
-        // if (DebugAxisOutput)
-        // {
-        //     Debug.Log($"[DroneInput][LeftStick] yaw={yaw:F1} normalizedYaw={normalizedYaw:F3} processedYaw={processedYaw:F3} upDown={processedUpDown:F3}");
-        // }
 
         return new Vector2(
             Mathf.Clamp(processedYaw * yawSensitivity, -1.0f, 1.0f), // 正が右回転
@@ -543,17 +547,15 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
 
         // --- 左右移動 (X-axis) ---
         float relativeX = droneLocalPos.x;
-        float normalizedX = Mathf.Clamp(relativeX / maxDisplacement, -1.0f, 1.0f);
+        float normalizedX = Mathf.Clamp(relativeX / maxDisplacement.x, -1.0f, 1.0f);
         float processedLeftRight = ApplyDeadzone(normalizedX, positionDeadzone);
         processedLeftRight = ApplyResponseCurve(processedLeftRight);
 
         // --- 前後移動 (Z-axis) ---
         float relativeZ = droneLocalPos.z;
-        float normalizedZ = Mathf.Clamp(relativeZ / maxDisplacement, -1.0f, 1.0f);
+        float normalizedZ = Mathf.Clamp(relativeZ / maxDisplacement.z, -1.0f, 1.0f);
         float processedForwardBack = ApplyDeadzone(normalizedZ, positionDeadzone);
         processedForwardBack = ApplyResponseCurve(processedForwardBack);
-
-        //Debug.Log($"[RightStick] In:{normalizedX:F2} Dead:{processedLeftRight:F2} Out:{processedLeftRight:F2}");
         
         return new Vector2(
             Mathf.Clamp(processedLeftRight, -1.0f, 1.0f),
@@ -599,4 +601,3 @@ public class HakoDroneSpidarInputManagerV2 : HapticPointerBase, IDroneInput
         parameter.serialize();
     }
 }
-
